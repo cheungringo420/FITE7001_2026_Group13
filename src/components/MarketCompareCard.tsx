@@ -27,11 +27,10 @@ export function MarketCompareCard({
     const priceDiffNo = ((polymarket.noPrice - kalshi.noPrice) * 100).toFixed(1);
 
     return (
-        <div className={`relative rounded-2xl border transition-all duration-300 overflow-hidden ${
-            arbitrage 
-                ? 'bg-gradient-to-br from-green-900/30 via-slate-900 to-emerald-900/30 border-green-500/50 shadow-lg shadow-green-500/10' 
+        <div className={`relative rounded-2xl border transition-all duration-300 overflow-hidden ${arbitrage
+                ? 'bg-gradient-to-br from-green-900/30 via-slate-900 to-emerald-900/30 border-green-500/50 shadow-lg shadow-green-500/10'
                 : 'bg-gradient-to-br from-slate-800/90 to-slate-900/90 border-slate-700/50 hover:border-slate-600'
-        }`}>
+            }`}>
             {/* Arbitrage Badge */}
             {arbitrage && (
                 <div className="absolute top-0 right-0 bg-gradient-to-l from-green-500 to-emerald-500 text-black font-bold px-4 py-1 text-sm rounded-bl-xl">
@@ -65,11 +64,10 @@ export function MarketCompareCard({
                     <span className="px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
                         {polymarket.category || 'General'}
                     </span>
-                    <span className={`px-2 py-0.5 rounded ${
-                        similarity >= 0.6 ? 'bg-green-500/20 text-green-400' :
-                        similarity >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-slate-600/50 text-slate-400'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded ${similarity >= 0.6 ? 'bg-green-500/20 text-green-400' :
+                            similarity >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-slate-600/50 text-slate-400'
+                        }`}>
                         {similarity >= 0.6 ? '🎯' : similarity >= 0.45 ? '🔗' : '💡'} {(similarity * 100).toFixed(0)}% similar
                     </span>
                 </div>
@@ -80,7 +78,7 @@ export function MarketCompareCard({
                 {/* Polymarket Side */}
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-4">
-                        <a 
+                        <a
                             href={polymarket.url || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -104,21 +102,19 @@ export function MarketCompareCard({
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">Yes</span>
-                            <span className={`text-lg font-bold ${
-                                arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform1.name === 'polymarket'
+                            <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform1.name === 'polymarket'
                                     ? 'text-green-400 animate-pulse'
                                     : 'text-green-400'
-                            }`}>
+                                }`}>
                                 {(polymarket.yesPrice * 100).toFixed(1)}¢
                             </span>
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">No</span>
-                            <span className={`text-lg font-bold ${
-                                arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform1.name === 'polymarket'
+                            <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform1.name === 'polymarket'
                                     ? 'text-red-400 animate-pulse'
                                     : 'text-red-400'
-                            }`}>
+                                }`}>
                                 {(polymarket.noPrice * 100).toFixed(1)}¢
                             </span>
                         </div>
@@ -145,7 +141,7 @@ export function MarketCompareCard({
                 {/* Kalshi Side */}
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-4">
-                        <a 
+                        <a
                             href={kalshi.url || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -170,11 +166,10 @@ export function MarketCompareCard({
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">Yes</span>
                             <div className="flex items-center gap-2">
-                                <span className={`text-lg font-bold ${
-                                    arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform2.name === 'kalshi'
+                                <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform2.name === 'kalshi'
                                         ? 'text-green-400 animate-pulse'
                                         : 'text-green-400'
-                                }`}>
+                                    }`}>
                                     {(kalshi.yesPrice * 100).toFixed(1)}¢
                                 </span>
                                 {parseFloat(priceDiffYes) !== 0 && (
@@ -187,11 +182,10 @@ export function MarketCompareCard({
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">No</span>
                             <div className="flex items-center gap-2">
-                                <span className={`text-lg font-bold ${
-                                    arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform2.name === 'kalshi'
+                                <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform2.name === 'kalshi'
                                         ? 'text-red-400 animate-pulse'
                                         : 'text-red-400'
-                                }`}>
+                                    }`}>
                                     {(kalshi.noPrice * 100).toFixed(1)}¢
                                 </span>
                                 {parseFloat(priceDiffNo) !== 0 && (
@@ -223,16 +217,14 @@ export function MarketCompareCard({
             </div>
 
             {/* Arbitrage Strategy - Always show, but dim if no opportunity */}
-            <div className={`p-4 border-t ${
-                arbitrage 
-                    ? 'bg-green-500/5 border-green-500/30' 
+            <div className={`p-4 border-t ${arbitrage
+                    ? 'bg-green-500/5 border-green-500/30'
                     : 'bg-slate-800/30 border-slate-700/30'
-            }`}>
+                }`}>
                 <div className="flex items-center justify-between">
                     <div className={arbitrage ? '' : 'opacity-60'}>
-                        <div className={`text-sm font-semibold mb-1 ${
-                            arbitrage ? 'text-green-400' : 'text-slate-400'
-                        }`}>
+                        <div className={`text-sm font-semibold mb-1 ${arbitrage ? 'text-green-400' : 'text-slate-400'
+                            }`}>
                             {arbitrage ? '📋 Arbitrage Strategy' : '📊 Potential Arbitrage Analysis'}
                         </div>
                         {arbitrage ? (
@@ -262,14 +254,14 @@ export function MarketCompareCard({
                                     <div className="flex flex-wrap gap-x-4 gap-y-1">
                                         <span>
                                             Strategy A: <span className="text-green-400/70">YES</span>@P + <span className="text-red-400/70">NO</span>@K = {((polymarket.yesPrice + kalshi.noPrice) * 100).toFixed(1)}¢
-                                            {polymarket.yesPrice + kalshi.noPrice < 1 
+                                            {polymarket.yesPrice + kalshi.noPrice < 1
                                                 ? <span className="text-green-400 ml-1">✓</span>
                                                 : <span className="text-slate-500 ml-1">({((polymarket.yesPrice + kalshi.noPrice - 1) * 100).toFixed(1)}¢ over)</span>
                                             }
                                         </span>
                                         <span>
                                             Strategy B: <span className="text-red-400/70">NO</span>@P + <span className="text-green-400/70">YES</span>@K = {((polymarket.noPrice + kalshi.yesPrice) * 100).toFixed(1)}¢
-                                            {polymarket.noPrice + kalshi.yesPrice < 1 
+                                            {polymarket.noPrice + kalshi.yesPrice < 1
                                                 ? <span className="text-green-400 ml-1">✓</span>
                                                 : <span className="text-slate-500 ml-1">({((polymarket.noPrice + kalshi.yesPrice - 1) * 100).toFixed(1)}¢ over)</span>
                                             }
@@ -285,11 +277,10 @@ export function MarketCompareCard({
                     <button
                         onClick={() => arbitrage && onExecuteArbitrage && onExecuteArbitrage(arbitrage)}
                         disabled={!arbitrage}
-                        className={`px-4 py-2 font-semibold rounded-lg transition-colors text-sm whitespace-nowrap ${
-                            arbitrage 
-                                ? 'bg-green-500 hover:bg-green-600 text-black cursor-pointer' 
+                        className={`px-4 py-2 font-semibold rounded-lg transition-colors text-sm whitespace-nowrap ${arbitrage
+                                ? 'bg-green-500 hover:bg-green-600 text-black cursor-pointer'
                                 : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-                        }`}
+                            }`}
                     >
                         {arbitrage ? 'Execute' : 'No Opportunity'}
                     </button>
@@ -318,9 +309,8 @@ export function SingleMarketCard({ market, platform }: SingleMarketCardProps) {
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-slate-600 transition-colors">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded flex items-center justify-center ${
-                        isPoly ? 'bg-purple-500/20' : 'bg-blue-500/20'
-                    }`}>
+                    <div className={`w-6 h-6 rounded flex items-center justify-center ${isPoly ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                        }`}>
                         <span className={`font-bold text-xs ${isPoly ? 'text-purple-400' : 'text-blue-400'}`}>
                             {isPoly ? 'P' : 'K'}
                         </span>
@@ -334,9 +324,8 @@ export function SingleMarketCard({ market, platform }: SingleMarketCardProps) {
                         href={market.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity ${
-                            isPoly ? 'text-purple-400 hover:text-purple-300' : 'text-blue-400 hover:text-blue-300'
-                        }`}
+                        className={`text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity ${isPoly ? 'text-purple-400 hover:text-purple-300' : 'text-blue-400 hover:text-blue-300'
+                            }`}
                         title={`Open on ${isPoly ? 'Polymarket' : 'Kalshi'}`}
                     >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,11 +363,10 @@ export function SingleMarketCard({ market, platform }: SingleMarketCardProps) {
                     href={market.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`block text-xs truncate text-center transition-colors ${
-                        isPoly 
-                            ? 'text-purple-400/60 hover:text-purple-400' 
+                    className={`block text-xs truncate text-center transition-colors ${isPoly
+                            ? 'text-purple-400/60 hover:text-purple-400'
                             : 'text-blue-400/60 hover:text-blue-400'
-                    }`}
+                        }`}
                     title={market.url}
                 >
                     🔗 {market.url.replace('https://', '')}

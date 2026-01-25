@@ -57,13 +57,13 @@ export function MarketCard({ market }: MarketCardProps) {
                     <div className="bg-green-500/10 rounded-xl p-3 border border-green-500/20">
                         <div className="text-xs text-green-400 mb-1 font-medium">Yes</div>
                         <div className="text-2xl font-bold text-green-400">
-                            {(yesPrice * 100).toFixed(0)}¢
+                            {(yesPrice * 100).toFixed(1)}¢
                         </div>
                     </div>
                     <div className="bg-red-500/10 rounded-xl p-3 border border-red-500/20">
                         <div className="text-xs text-red-400 mb-1 font-medium">No</div>
                         <div className="text-2xl font-bold text-red-400">
-                            {(noPrice * 100).toFixed(0)}¢
+                            {(noPrice * 100).toFixed(1)}¢
                         </div>
                     </div>
                 </div>
