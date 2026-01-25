@@ -64,14 +64,26 @@ export async function GET(request: Request) {
 
         console.log(`Kalshi API: fetched ${allMarkets.length} total markets`);
 
-        // Filter out sports betting markets and normalize
+        // Filter out sports betting markets and invalid markets
         const normalizedMarkets = allMarkets
             .filter(m => {
                 const title = m.title?.toLowerCase() || '';
+                
                 // Filter out sports stats markets
                 const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown/i.test(title);
+                
+                // Filter out parlay/multi-leg sports bets (titles starting with "yes " followed by team names)
+                const isParlay = /^yes\s+[a-z]/i.test(title) || title.includes(',yes ');
+                
+                // Filter out markets with sports team patterns
+                const hasSportsTeams = /\b(ducks|maple leafs|blackhawks|devils|canucks|golden knights|lakers|celtics|warriors|bulls|heat|nets|knicks|clippers|mavericks|suns|nuggets|bucks|76ers|raptors|spurs|rockets|pistons|pacers|magic|hornets|hawks|cavaliers|wizards|grizzlies|pelicans|timberwolves|thunder|trail blazers|kings|jazz)\b/i.test(title);
+                
+                // Filter out markets with no real price data (50/50 default)
+                const hasDefaultPrice = m.yes_bid === 50 && m.volume === 0;
+                
                 const isActive = m.status === 'open' || m.status === 'active';
-                return isActive && !isSportsStats;
+                
+                return isActive && !isSportsStats && !isParlay && !hasSportsTeams && !hasDefaultPrice;
             })
             .map(m => {
                 try {
