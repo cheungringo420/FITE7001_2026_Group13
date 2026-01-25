@@ -6,7 +6,7 @@ const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
-    const limit = parseInt(searchParams.get('limit') || '30');
+    const limit = parseInt(searchParams.get('limit') || '200');
 
     try {
         // Fetch both regular markets and events for better coverage

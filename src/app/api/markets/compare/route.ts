@@ -34,16 +34,17 @@ export async function GET() {
         // For Kalshi, we fetch both regular markets AND events with nested markets
         // Events contain more political/event-based markets that are comparable to Polymarket
         const [polymarketRes, kalshiMarketsRes, kalshiEventsRes] = await Promise.all([
-            fetch(`${GAMMA_API_BASE}/markets?limit=100&active=true&closed=false&enableOrderBook=true`, {
+            // Fetch more markets for comprehensive coverage
+            fetch(`${GAMMA_API_BASE}/markets?limit=200&active=true&closed=false&enableOrderBook=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
-            fetch(`${KALSHI_API_BASE}/markets?limit=200&status=open`, {
+            fetch(`${KALSHI_API_BASE}/markets?limit=500&status=open`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
             // Fetch events with nested markets for better coverage of political/event markets
-            fetch(`${KALSHI_API_BASE}/events?limit=100&status=open&with_nested_markets=true`, {
+            fetch(`${KALSHI_API_BASE}/events?limit=200&status=open&with_nested_markets=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
@@ -164,15 +165,14 @@ export async function GET() {
         }
 
         // Get unmatched markets - sort by volume for relevance
+        // Show all unmatched markets (no limit)
         const unmatchedPolymarket = normalizedPolymarket
             .filter(m => !matchedPolyIds.has(m.id))
-            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
-            .slice(0, 30);
+            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
 
         const unmatchedKalshi = normalizedKalshi
             .filter(m => !matchedKalshiIds.has(m.id))
-            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
-            .slice(0, 30);
+            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
 
         const response: CompareResponse = {
             matchedPairs: matchedPairs.sort((a, b) => {

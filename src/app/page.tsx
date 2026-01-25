@@ -40,9 +40,10 @@ export default function HomePage() {
       setError(null);
 
       // Fetch from both platforms in parallel
+      // Increased limits to show more markets
       const [polyRes, kalshiRes] = await Promise.all([
-        fetch('/api/markets?limit=30&order=volume24hr&ascending=false'),
-        fetch('/api/kalshi/markets?limit=30'),
+        fetch('/api/markets?limit=100&order=volume24hr&ascending=false'),
+        fetch('/api/kalshi/markets?limit=200'),
       ]);
 
       if (polyRes.ok) {
@@ -80,7 +81,7 @@ export default function HomePage() {
       volume24h: m.volume24hr || 0,
       volume: parseFloat(m.volume) || 0,
       image: m.image,
-      url: m.events?.[0]?.slug 
+      url: m.events?.[0]?.slug
         ? `https://polymarket.com/event/${m.events[0].slug}`
         : `https://polymarket.com/event/${m.slug}`,
       active: m.active && !m.closed,
@@ -194,28 +195,26 @@ export default function HomePage() {
           <h2 className="text-2xl font-bold text-white">
             {searchQuery ? `Search Results (${filteredMarkets.length})` : 'Trending Markets'}
           </h2>
-          
+
           {/* Platform Filter Tabs */}
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-slate-700/50">
               <button
                 onClick={() => setPlatformFilter('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platformFilter === 'all'
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${platformFilter === 'all'
                     ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/30'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 All
                 <span className="ml-1.5 text-xs text-slate-500">({polyCount + kalshiCount})</span>
               </button>
               <button
                 onClick={() => setPlatformFilter('polymarket')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  platformFilter === 'polymarket'
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'polymarket'
                     ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <span className="w-4 h-4 rounded bg-purple-500/30 text-purple-400 text-[10px] flex items-center justify-center font-bold">P</span>
                 Polymarket
@@ -223,11 +222,10 @@ export default function HomePage() {
               </button>
               <button
                 onClick={() => setPlatformFilter('kalshi')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  platformFilter === 'kalshi'
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'kalshi'
                     ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <span className="w-4 h-4 rounded bg-blue-500/30 text-blue-400 text-[10px] flex items-center justify-center font-bold">K</span>
                 Kalshi
@@ -286,9 +284,9 @@ export default function HomePage() {
           ) : filteredMarkets.length > 0 ? (
             filteredMarkets.map((market) => (
               market.platform === 'polymarket' ? (
-                <MarketCard 
-                  key={market.id} 
-                  market={polymarketData.find(m => m.conditionId === market.id)!} 
+                <MarketCard
+                  key={market.id}
+                  market={polymarketData.find(m => m.conditionId === market.id)!}
                 />
               ) : (
                 <KalshiMarketCard key={market.id} market={market} />
