@@ -222,44 +222,79 @@ export function MarketCompareCard({
                 </div>
             </div>
 
-            {/* Arbitrage Strategy */}
-            {arbitrage && (
-                <div className="p-4 bg-green-500/5 border-t border-green-500/30">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-sm text-green-400 font-semibold mb-1">
-                                📋 Arbitrage Strategy
-                            </div>
-                            <div className="text-sm text-slate-300">
-                                {arbitrage.strategy === 'buy-yes-a-no-b' ? (
-                                    <>
-                                        Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.yesPrice * 100).toFixed(1)}¢
-                                        {' + '}
-                                        Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.noPrice * 100).toFixed(1)}¢
-                                    </>
-                                ) : (
-                                    <>
-                                        Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.noPrice * 100).toFixed(1)}¢
-                                        {' + '}
-                                        Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.yesPrice * 100).toFixed(1)}¢
-                                    </>
-                                )}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1">
-                                Cost: ${arbitrage.totalCost.toFixed(4)} → Payout: $1.00 = <span className="text-green-400">${arbitrage.guaranteedProfit.toFixed(4)} profit</span>
-                            </div>
+            {/* Arbitrage Strategy - Always show, but dim if no opportunity */}
+            <div className={`p-4 border-t ${
+                arbitrage 
+                    ? 'bg-green-500/5 border-green-500/30' 
+                    : 'bg-slate-800/30 border-slate-700/30'
+            }`}>
+                <div className="flex items-center justify-between">
+                    <div className={arbitrage ? '' : 'opacity-60'}>
+                        <div className={`text-sm font-semibold mb-1 ${
+                            arbitrage ? 'text-green-400' : 'text-slate-400'
+                        }`}>
+                            {arbitrage ? '📋 Arbitrage Strategy' : '📊 Potential Arbitrage Analysis'}
                         </div>
-                        {onExecuteArbitrage && (
-                            <button
-                                onClick={() => onExecuteArbitrage(arbitrage)}
-                                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black font-semibold rounded-lg transition-colors text-sm whitespace-nowrap"
-                            >
-                                Execute
-                            </button>
+                        {arbitrage ? (
+                            <>
+                                <div className="text-sm text-slate-300">
+                                    {arbitrage.strategy === 'buy-yes-a-no-b' ? (
+                                        <>
+                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.yesPrice * 100).toFixed(1)}¢
+                                            {' + '}
+                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.noPrice * 100).toFixed(1)}¢
+                                        </>
+                                    ) : (
+                                        <>
+                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.noPrice * 100).toFixed(1)}¢
+                                            {' + '}
+                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.yesPrice * 100).toFixed(1)}¢
+                                        </>
+                                    )}
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1">
+                                    Cost: ${arbitrage.totalCost.toFixed(4)} → Payout: $1.00 = <span className="text-green-400">${arbitrage.guaranteedProfit.toFixed(4)} profit</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-sm text-slate-400">
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span>
+                                            Strategy A: <span className="text-green-400/70">YES</span>@P + <span className="text-red-400/70">NO</span>@K = {((polymarket.yesPrice + kalshi.noPrice) * 100).toFixed(1)}¢
+                                            {polymarket.yesPrice + kalshi.noPrice < 1 
+                                                ? <span className="text-green-400 ml-1">✓</span>
+                                                : <span className="text-slate-500 ml-1">({((polymarket.yesPrice + kalshi.noPrice - 1) * 100).toFixed(1)}¢ over)</span>
+                                            }
+                                        </span>
+                                        <span>
+                                            Strategy B: <span className="text-red-400/70">NO</span>@P + <span className="text-green-400/70">YES</span>@K = {((polymarket.noPrice + kalshi.yesPrice) * 100).toFixed(1)}¢
+                                            {polymarket.noPrice + kalshi.yesPrice < 1 
+                                                ? <span className="text-green-400 ml-1">✓</span>
+                                                : <span className="text-slate-500 ml-1">({((polymarket.noPrice + kalshi.yesPrice - 1) * 100).toFixed(1)}¢ over)</span>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">
+                                    💡 Need total cost &lt; 100¢ for arbitrage. Watch for price changes.
+                                </div>
+                            </>
                         )}
                     </div>
+                    <button
+                        onClick={() => arbitrage && onExecuteArbitrage && onExecuteArbitrage(arbitrage)}
+                        disabled={!arbitrage}
+                        className={`px-4 py-2 font-semibold rounded-lg transition-colors text-sm whitespace-nowrap ${
+                            arbitrage 
+                                ? 'bg-green-500 hover:bg-green-600 text-black cursor-pointer' 
+                                : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+                        }`}
+                    >
+                        {arbitrage ? 'Execute' : 'No Opportunity'}
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -31,20 +31,25 @@ export interface CompareResponse {
 export async function GET() {
     try {
         // Fetch markets from both platforms in parallel
-        // For Kalshi, we fetch both regular markets AND events with nested markets
-        // Events contain more political/event-based markets that are comparable to Polymarket
-        const [polymarketRes, kalshiMarketsRes, kalshiEventsRes] = await Promise.all([
+        // For Kalshi, we fetch from multiple endpoints and use pagination
+        const [polymarketRes, kalshiMarketsRes1, kalshiMarketsRes2, kalshiEventsRes] = await Promise.all([
             // Fetch ALL markets for comprehensive coverage
             fetch(`${GAMMA_API_BASE}/markets?limit=1000&active=true&closed=false&enableOrderBook=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
-            fetch(`${KALSHI_API_BASE}/markets?limit=1000&status=open`, {
+            // Kalshi markets endpoint - try without status filter first
+            fetch(`${KALSHI_API_BASE}/markets?limit=1000`, {
+                headers: { 'Accept': 'application/json' },
+                next: { revalidate: 60 },
+            }),
+            // Also try with active status
+            fetch(`${KALSHI_API_BASE}/markets?limit=1000&status=active`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
             // Fetch events with nested markets for better coverage of political/event markets
-            fetch(`${KALSHI_API_BASE}/events?limit=500&status=open&with_nested_markets=true`, {
+            fetch(`${KALSHI_API_BASE}/events?limit=1000&with_nested_markets=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
@@ -60,33 +65,49 @@ export async function GET() {
         const allKalshiMarkets: KalshiMarket[] = [];
         const seenTickers = new Set<string>();
 
-        // Add markets from direct markets endpoint
-        if (kalshiMarketsRes.ok) {
-            const kalshiData = await kalshiMarketsRes.json();
-            const markets = kalshiData.markets || [];
-            for (const m of markets) {
-                if (!seenTickers.has(m.ticker)) {
-                    seenTickers.add(m.ticker);
-                    allKalshiMarkets.push(m);
-                }
-            }
-        }
-
-        // Add markets from events (these are often better for comparison)
-        if (kalshiEventsRes.ok) {
-            const eventsData = await kalshiEventsRes.json();
-            const events: KalshiEvent[] = eventsData.events || [];
-            for (const event of events) {
-                if (event.markets) {
-                    for (const m of event.markets) {
-                        if (!seenTickers.has(m.ticker)) {
+        // Helper to add markets from a response
+        const addMarketsFromResponse = async (res: Response) => {
+            if (res.ok) {
+                try {
+                    const data = await res.json();
+                    const markets = data.markets || [];
+                    for (const m of markets) {
+                        if (m.ticker && !seenTickers.has(m.ticker)) {
                             seenTickers.add(m.ticker);
                             allKalshiMarkets.push(m);
                         }
                     }
+                } catch (e) {
+                    console.error('Error parsing Kalshi markets response:', e);
                 }
             }
+        };
+
+        // Add markets from direct markets endpoints (multiple fetches)
+        await addMarketsFromResponse(kalshiMarketsRes1);
+        await addMarketsFromResponse(kalshiMarketsRes2);
+
+        // Add markets from events (these are often better for comparison)
+        if (kalshiEventsRes.ok) {
+            try {
+                const eventsData = await kalshiEventsRes.json();
+                const events: KalshiEvent[] = eventsData.events || [];
+                for (const event of events) {
+                    if (event.markets) {
+                        for (const m of event.markets) {
+                            if (m.ticker && !seenTickers.has(m.ticker)) {
+                                seenTickers.add(m.ticker);
+                                allKalshiMarkets.push(m);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing Kalshi events response:', e);
+            }
         }
+
+        console.log(`Fetched Kalshi markets: ${allKalshiMarkets.length} total (${seenTickers.size} unique)`);
 
         // Normalize Polymarket markets
         const normalizedPolymarket: NormalizedMarket[] = polymarketData

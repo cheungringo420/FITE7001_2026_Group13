@@ -68,7 +68,7 @@ export default function ComparePage() {
     // Filter pairs by user-selected similarity threshold
     const thresholdFilteredPairs = data?.matchedPairs.filter(p => p.similarity >= similarityThreshold) || [];
     const arbitrageCount = thresholdFilteredPairs.filter(p => p.arbitrage).length;
-    const filteredPairs = showOnlyArbitrage 
+    const filteredPairs = showOnlyArbitrage
         ? thresholdFilteredPairs.filter(p => p.arbitrage)
         : thresholdFilteredPairs;
 
@@ -148,11 +148,10 @@ export default function ComparePage() {
                                 <span className="text-white font-medium">Similarity Threshold</span>
                             </div>
                             <div className="flex items-center gap-3">
-                                <span className={`text-2xl font-bold ${
-                                    similarityThreshold >= 0.7 ? 'text-green-400' :
-                                    similarityThreshold >= 0.5 ? 'text-yellow-400' :
-                                    'text-orange-400'
-                                }`}>
+                                <span className={`text-2xl font-bold ${similarityThreshold >= 0.7 ? 'text-green-400' :
+                                        similarityThreshold >= 0.5 ? 'text-yellow-400' :
+                                            'text-orange-400'
+                                    }`}>
                                     {Math.round(similarityThreshold * 100)}%
                                 </span>
                                 <span className="text-slate-500 text-sm">
@@ -160,7 +159,7 @@ export default function ComparePage() {
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div className="relative">
                             <input
                                 type="range"
@@ -196,11 +195,10 @@ export default function ComparePage() {
                                 <button
                                     key={preset.value}
                                     onClick={() => setSimilarityThreshold(preset.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                        Math.abs(similarityThreshold - preset.value) < 0.05
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${Math.abs(similarityThreshold - preset.value) < 0.05
                                             ? 'bg-purple-500 text-white'
                                             : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                    }`}
+                                        }`}
                                 >
                                     {preset.label}
                                     <span className="ml-1 opacity-70">{preset.desc}</span>
@@ -264,21 +262,19 @@ export default function ComparePage() {
                     <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1">
                         <button
                             onClick={() => setViewMode('matched')}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                viewMode === 'matched'
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'matched'
                                     ? 'bg-slate-700 text-white'
                                     : 'text-slate-400 hover:text-white'
-                            }`}
+                                }`}
                         >
                             Related Markets
                         </button>
                         <button
                             onClick={() => setViewMode('all')}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                viewMode === 'all'
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'all'
                                     ? 'bg-slate-700 text-white'
                                     : 'text-slate-400 hover:text-white'
-                            }`}
+                                }`}
                         >
                             All Markets
                         </button>
@@ -314,8 +310,8 @@ export default function ComparePage() {
                                 <div className="flex items-start gap-2">
                                     <span className="text-amber-400">⚠️</span>
                                     <div className="text-amber-200">
-                                        <strong>Note:</strong> These are <em>related</em> markets on similar topics, not identical markets. 
-                                        The two platforms have different resolution criteria and timeframes. 
+                                        <strong>Note:</strong> These are <em>related</em> markets on similar topics, not identical markets.
+                                        The two platforms have different resolution criteria and timeframes.
                                         True arbitrage requires markets with the <em>exact same</em> resolution conditions.
                                     </div>
                                 </div>
@@ -352,7 +348,7 @@ export default function ComparePage() {
                                     {showOnlyArbitrage ? 'No Arbitrage Found' : 'No Related Markets Found'}
                                 </h3>
                                 <p className="text-slate-400 max-w-md mx-auto">
-                                    {showOnlyArbitrage 
+                                    {showOnlyArbitrage
                                         ? 'Markets are currently efficient. Keep scanning - opportunities can appear at any time.'
                                         : 'No topically related markets found between platforms. Browse "All Markets" to see each platform\'s offerings.'}
                                 </p>

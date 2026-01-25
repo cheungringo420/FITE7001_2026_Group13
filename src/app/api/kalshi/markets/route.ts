@@ -6,16 +6,23 @@ const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
-    const limit = parseInt(searchParams.get('limit') || '200');
+    const limit = parseInt(searchParams.get('limit') || '500');
 
     try {
-        // Fetch both regular markets and events for better coverage
-        const [marketsRes, eventsRes] = await Promise.all([
-            fetch(`${KALSHI_API_BASE}/markets?limit=${limit}&status=open`, {
+        // Fetch from multiple endpoints for better coverage
+        const [marketsRes1, marketsRes2, eventsRes] = await Promise.all([
+            // Fetch without status filter (gets all markets)
+            fetch(`${KALSHI_API_BASE}/markets?limit=1000`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 30 },
             }),
-            fetch(`${KALSHI_API_BASE}/events?limit=50&status=open&with_nested_markets=true`, {
+            // Fetch with active status
+            fetch(`${KALSHI_API_BASE}/markets?limit=1000&status=active`, {
+                headers: { 'Accept': 'application/json' },
+                next: { revalidate: 30 },
+            }),
+            // Fetch all events with nested markets
+            fetch(`${KALSHI_API_BASE}/events?limit=500&with_nested_markets=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 30 },
             }),
@@ -24,15 +31,24 @@ export async function GET(request: Request) {
         const allMarkets: KalshiMarket[] = [];
         const seenTickers = new Set<string>();
 
-        // Add markets from direct endpoint
-        if (marketsRes.ok) {
-            const marketsData = await marketsRes.json();
-            for (const m of (marketsData.markets || [])) {
-                if (!seenTickers.has(m.ticker)) {
+        // Helper to add markets
+        const addMarkets = (markets: KalshiMarket[]) => {
+            for (const m of markets) {
+                if (m.ticker && !seenTickers.has(m.ticker)) {
                     seenTickers.add(m.ticker);
                     allMarkets.push(m);
                 }
             }
+        };
+
+        // Add markets from direct endpoints
+        if (marketsRes1.ok) {
+            const data = await marketsRes1.json();
+            addMarkets(data.markets || []);
+        }
+        if (marketsRes2.ok) {
+            const data = await marketsRes2.json();
+            addMarkets(data.markets || []);
         }
 
         // Add markets from events
@@ -41,15 +57,12 @@ export async function GET(request: Request) {
             const events: KalshiEvent[] = eventsData.events || [];
             for (const event of events) {
                 if (event.markets) {
-                    for (const m of event.markets) {
-                        if (!seenTickers.has(m.ticker)) {
-                            seenTickers.add(m.ticker);
-                            allMarkets.push(m);
-                        }
-                    }
+                    addMarkets(event.markets);
                 }
             }
         }
+
+        console.log(`Kalshi API: fetched ${allMarkets.length} total markets`);
 
         // Filter out sports betting markets and normalize
         const normalizedMarkets = allMarkets
