@@ -202,8 +202,8 @@ export default function HomePage() {
               <button
                 onClick={() => setPlatformFilter('all')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${platformFilter === 'all'
-                    ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/30'
-                    : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/30'
+                  : 'text-slate-400 hover:text-white'
                   }`}
               >
                 All
@@ -212,8 +212,8 @@ export default function HomePage() {
               <button
                 onClick={() => setPlatformFilter('polymarket')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'polymarket'
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                    : 'text-slate-400 hover:text-white'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : 'text-slate-400 hover:text-white'
                   }`}
               >
                 <span className="w-4 h-4 rounded bg-purple-500/30 text-purple-400 text-[10px] flex items-center justify-center font-bold">P</span>
@@ -223,8 +223,8 @@ export default function HomePage() {
               <button
                 onClick={() => setPlatformFilter('kalshi')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'kalshi'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-slate-400 hover:text-white'
                   }`}
               >
                 <span className="w-4 h-4 rounded bg-blue-500/30 text-blue-400 text-[10px] flex items-center justify-center font-bold">K</span>
@@ -360,28 +360,27 @@ function KalshiMarketCard({ market }: { market: DisplayMarket }) {
   return (
     <a href={market.url} target="_blank" rel="noopener noreferrer">
       <div className="market-card group relative bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm rounded-2xl p-5 border border-blue-500/30 hover:border-blue-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 cursor-pointer">
-        {/* Platform Badge */}
-        <div className="absolute top-4 right-4 flex items-center gap-1.5">
-          <span className="w-5 h-5 rounded bg-blue-500/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">K</span>
+        {/* Platform Badge + Live indicator - Always visible */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/20 border border-blue-500/30">
+            <span className="w-4 h-4 rounded bg-blue-500/30 text-blue-400 text-[10px] flex items-center justify-center font-bold">K</span>
+            <span className="text-xs text-blue-400 font-medium">Kalshi</span>
+          </span>
           {market.active && (
-            <>
+            <div className="flex items-center gap-1">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
               <span className="text-xs text-green-400 font-medium">LIVE</span>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Category */}
-        {market.category && (
-          <div className="mb-3">
-            <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-300">
-              {market.category}
-            </span>
-          </div>
-        )}
+        {/* Placeholder for image alignment */}
+        <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 mb-4 flex items-center justify-center">
+          <span className="text-blue-400 text-lg font-bold">K</span>
+        </div>
 
         {/* Question */}
-        <h3 className="text-white font-semibold text-lg mb-4 line-clamp-2 group-hover:text-blue-200 transition-colors pr-16">
+        <h3 className="text-white font-semibold text-lg mb-4 line-clamp-2 group-hover:text-blue-200 transition-colors">
           {market.question}
         </h3>
 
@@ -415,13 +414,22 @@ function KalshiMarketCard({ market }: { market: DisplayMarket }) {
               </div>
             )}
           </div>
-          <span className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          <span className="text-blue-400 flex items-center gap-1">
             Kalshi
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </span>
         </div>
+
+        {/* Category Badge */}
+        {market.category && (
+          <div className="mt-3 pt-3 border-t border-slate-700/50">
+            <span className="px-2 py-1 rounded-full text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20">
+              {market.category}
+            </span>
+          </div>
+        )}
       </div>
     </a>
   );

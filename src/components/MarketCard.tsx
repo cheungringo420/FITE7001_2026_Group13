@@ -21,18 +21,24 @@ export function MarketCard({ market }: MarketCardProps) {
 
     return (
         <Link href={`/market/${market.conditionId}`}>
-            <div className="market-card group relative bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm rounded-2xl p-5 border border-slate-700/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 cursor-pointer">
-                {/* Live indicator */}
-                {market.active && !market.closed && (
-                    <div className="absolute top-4 right-4 flex items-center gap-1.5">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        <span className="text-xs text-green-400 font-medium">LIVE</span>
-                    </div>
-                )}
+            <div className="market-card group relative bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm rounded-2xl p-5 border border-purple-500/30 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 cursor-pointer">
+                {/* Platform Badge + Live indicator */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                        <span className="w-4 h-4 rounded bg-purple-500/30 text-purple-400 text-[10px] flex items-center justify-center font-bold">P</span>
+                        <span className="text-xs text-purple-400 font-medium">Polymarket</span>
+                    </span>
+                    {market.active && !market.closed && (
+                        <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            <span className="text-xs text-green-400 font-medium">LIVE</span>
+                        </div>
+                    )}
+                </div>
 
                 {/* Market Image */}
                 {market.image && (
-                    <div className="w-12 h-12 rounded-xl overflow-hidden mb-4 ring-2 ring-slate-700 group-hover:ring-purple-500/50 transition-all">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden mb-4 ring-2 ring-purple-500/30 group-hover:ring-purple-500/50 transition-all">
                         <img
                             src={market.image}
                             alt=""
@@ -83,8 +89,8 @@ export function MarketCard({ market }: MarketCardProps) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="relative text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="⚠️ May be geo-restricted in some regions. Data is fetched via API regardless."
+                                className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1"
+                                title="Open on Polymarket"
                             >
                                 Polymarket
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +98,7 @@ export function MarketCard({ market }: MarketCardProps) {
                                 </svg>
                             </a>
                         )}
-                        <span className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-purple-400">
                             View →
                         </span>
                     </div>
@@ -100,8 +106,8 @@ export function MarketCard({ market }: MarketCardProps) {
 
                 {/* Category Badge */}
                 {market.category && (
-                    <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="px-2 py-1 rounded-full text-xs bg-slate-700/50 text-slate-300">
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                        <span className="px-2 py-1 rounded-full text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20">
                             {market.category}
                         </span>
                     </div>
