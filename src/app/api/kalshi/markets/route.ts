@@ -1,43 +1,81 @@
 import { NextResponse } from 'next/server';
+import { normalizeKalshiMarket, KalshiMarket, KalshiEvent } from '@/lib/kalshi';
 
 const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
-    const params = new URLSearchParams();
-
-    const limit = searchParams.get('limit') || '20';
-    const cursor = searchParams.get('cursor');
-    const status = searchParams.get('status') || 'open';
-    const event_ticker = searchParams.get('event_ticker');
-    const series_ticker = searchParams.get('series_ticker');
-
-    params.set('limit', limit);
-    params.set('status', status);
-    if (cursor) params.set('cursor', cursor);
-    if (event_ticker) params.set('event_ticker', event_ticker);
-    if (series_ticker) params.set('series_ticker', series_ticker);
+    const limit = parseInt(searchParams.get('limit') || '30');
 
     try {
-        const url = `${KALSHI_API_BASE}/markets?${params.toString()}`;
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'application/json',
-            },
-            next: { revalidate: 30 },
-        });
+        // Fetch both regular markets and events for better coverage
+        const [marketsRes, eventsRes] = await Promise.all([
+            fetch(`${KALSHI_API_BASE}/markets?limit=${limit}&status=open`, {
+                headers: { 'Accept': 'application/json' },
+                next: { revalidate: 30 },
+            }),
+            fetch(`${KALSHI_API_BASE}/events?limit=50&status=open&with_nested_markets=true`, {
+                headers: { 'Accept': 'application/json' },
+                next: { revalidate: 30 },
+            }),
+        ]);
 
-        if (!response.ok) {
-            throw new Error(`Kalshi API error: ${response.status}`);
+        const allMarkets: KalshiMarket[] = [];
+        const seenTickers = new Set<string>();
+
+        // Add markets from direct endpoint
+        if (marketsRes.ok) {
+            const marketsData = await marketsRes.json();
+            for (const m of (marketsData.markets || [])) {
+                if (!seenTickers.has(m.ticker)) {
+                    seenTickers.add(m.ticker);
+                    allMarkets.push(m);
+                }
+            }
         }
 
-        const data = await response.json();
-        return NextResponse.json(data);
+        // Add markets from events
+        if (eventsRes.ok) {
+            const eventsData = await eventsRes.json();
+            const events: KalshiEvent[] = eventsData.events || [];
+            for (const event of events) {
+                if (event.markets) {
+                    for (const m of event.markets) {
+                        if (!seenTickers.has(m.ticker)) {
+                            seenTickers.add(m.ticker);
+                            allMarkets.push(m);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Filter out sports betting markets and normalize
+        const normalizedMarkets = allMarkets
+            .filter(m => {
+                const title = m.title?.toLowerCase() || '';
+                // Filter out sports stats markets
+                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown/i.test(title);
+                const isActive = m.status === 'open' || m.status === 'active';
+                return isActive && !isSportsStats;
+            })
+            .map(m => {
+                try {
+                    return normalizeKalshiMarket(m);
+                } catch {
+                    return null;
+                }
+            })
+            .filter(m => m !== null && m.yesPrice > 0)
+            .sort((a, b) => (b!.volume24h || 0) - (a!.volume24h || 0))
+            .slice(0, limit);
+
+        return NextResponse.json({ markets: normalizedMarkets });
     } catch (error) {
         console.error('Error fetching Kalshi markets:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch Kalshi markets' },
+            { error: 'Failed to fetch Kalshi markets', markets: [] },
             { status: 500 }
         );
     }

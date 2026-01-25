@@ -139,7 +139,7 @@ export async function GET() {
             // Create a unique key based on question texts to avoid duplicates
             // (Kalshi often has multiple markets with same title for different candidates)
             const pairKey = `${match.polymarket.question}|||${match.kalshi.question}`;
-            
+
             if (seenPairs.has(pairKey)) {
                 continue; // Skip duplicate pair
             }
