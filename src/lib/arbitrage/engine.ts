@@ -31,47 +31,92 @@ export function normalizePolymarketMarket(market: ParsedMarket): NormalizedMarke
     };
 }
 
-// --- Matching Logic Helpers ---
+// --- Enhanced Matching Logic ---
 
-const ENTITY_WEIGHT = 0.4;
-const JACCARD_WEIGHT = 0.4;
-const DATE_WEIGHT = 0.1;
-const TOPIC_WEIGHT = 0.1;
+// Scoring weights - emphasize entity and exact matches
+const ENTITY_WEIGHT = 0.35;
+const JACCARD_WEIGHT = 0.25;
+const DATE_WEIGHT = 0.20;
+const TOPIC_WEIGHT = 0.10;
+const EXACT_PHRASE_WEIGHT = 0.10;
 
-// Key topics/entities that indicate similar markets if both contain them
+// Key people/entities that MUST match if present in both questions
+const CRITICAL_ENTITIES = [
+    // Politicians
+    'trump', 'biden', 'harris', 'desantis', 'newsom', 'pence', 'obama', 'pelosi',
+    'sanders', 'aoc', 'ocasio-cortez', 'mcconnell', 'schumer', 'vance',
+    // Tech figures  
+    'elon', 'musk', 'zuckerberg', 'bezos', 'altman', 'pichai', 'cook', 'nadella',
+    // World leaders
+    'putin', 'xi', 'jinping', 'zelensky', 'netanyahu', 'modi',
+    // Pope/Religious
+    'pope', 'francis', 'conclave',
+    // Companies
+    'tesla', 'spacex', 'openai', 'anthropic', 'google', 'meta', 'apple', 'nvidia',
+    // Specific events
+    'super bowl', 'oscars', 'grammy', 'world cup',
+];
+
+// Key topics that indicate related markets
 const KEY_TOPICS = [
-    'trump', 'biden', 'elon', 'musk', 'doge', 'spacex', 'tesla',
     'fed', 'interest rate', 'inflation', 'gdp', 'recession', 'unemployment',
     'election', 'president', 'congress', 'senate', 'house', 'supreme court',
-    'pope', 'china', 'russia', 'ukraine', 'israel', 'iran',
-    'ai', 'openai', 'anthropic', 'chatgpt', 'gpt',
-    'bitcoin', 'crypto', 'ethereum',
-    'mars', 'nasa', 'moon',
-    'oscar', 'emmy', 'grammy', 'super bowl',
+    'china', 'russia', 'ukraine', 'israel', 'iran', 'taiwan',
+    'ai', 'bitcoin', 'crypto', 'ethereum',
+    'mars', 'nasa', 'moon', 'starship',
     'deportation', 'immigration', 'border',
     'tariff', 'trade war',
+    'trillionaire', 'billionaire',
+    'doge', 'budget', 'deficit',
 ];
+
+// Extract critical entities (person names, companies) that MUST match
+function extractCriticalEntities(text: string): Set<string> {
+    const lowerText = text.toLowerCase();
+    const found = new Set<string>();
+    
+    for (const entity of CRITICAL_ENTITIES) {
+        if (lowerText.includes(entity)) {
+            // Normalize similar entities
+            if (entity === 'elon' || entity === 'musk') {
+                found.add('elon_musk');
+            } else if (entity === 'xi' || entity === 'jinping') {
+                found.add('xi_jinping');
+            } else if (entity === 'ocasio-cortez' || entity === 'aoc') {
+                found.add('aoc');
+            } else {
+                found.add(entity);
+            }
+        }
+    }
+    return found;
+}
 
 function extractEntities(text: string): Set<string> {
     const entities = new Set<string>();
 
-    // Numbers with units or qualifiers (e.g. 25bps, $100M, 50+)
-    const numberMatches = text.match(/\b\d+(\.\d+)?[a-z%+]*/gi);
-    if (numberMatches) numberMatches.forEach(m => entities.add(m.toLowerCase()));
+    // Numbers with context (e.g. 25bps, $100M, 50%, 2 trillion)
+    const numberMatches = text.match(/\$?\d+(\.\d+)?\s*(bps|%|billion|trillion|million|m|b|k)?/gi);
+    if (numberMatches) numberMatches.forEach(m => entities.add(m.toLowerCase().replace(/\s+/g, '')));
 
     // Dates (Month Year, Month Day)
     const dateMatches = text.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,4}/gi);
     if (dateMatches) dateMatches.forEach(m => entities.add(m.toLowerCase()));
 
-    // Year mentions (2024, 2025, 2026, etc.)
+    // Year mentions (2024, 2025, 2026, 2027, 2028, etc.)
     const yearMatches = text.match(/\b20[2-3]\d\b/g);
     if (yearMatches) yearMatches.forEach(m => entities.add(m));
 
-    // Proper Nouns / Capitalized words (excluding common stop words)
-    const properNounMatches = text.match(/\b[A-Z][a-z]+(\s+[A-Z][a-z]+)*\b/g);
+    // Specific dates like "Jan 31", "January 31st"
+    const shortDateMatches = text.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(st|nd|rd|th)?/gi);
+    if (shortDateMatches) shortDateMatches.forEach(m => entities.add(m.toLowerCase()));
+
+    // Proper Nouns / Capitalized multi-word names
+    const properNounMatches = text.match(/\b[A-Z][a-z]+(\s+[A-Z][a-z]+)+\b/g);
     if (properNounMatches) {
+        const stopPhrases = ['The', 'Will', 'Who', 'What', 'After', 'Before', 'When', 'How', 'Which', 'Democratic', 'Republican', 'United States'];
         properNounMatches.forEach(m => {
-            if (!['The', 'Will', 'Who', 'What', 'After', 'Before', 'When', 'How', 'Which'].includes(m)) {
+            if (!stopPhrases.some(s => m.startsWith(s))) {
                 entities.add(m.toLowerCase());
             }
         });
@@ -91,6 +136,41 @@ function extractKeyTopics(text: string): Set<string> {
     return found;
 }
 
+// Extract years mentioned in text
+function extractYears(text: string): Set<string> {
+    const years = new Set<string>();
+    const yearMatches = text.match(/\b20[2-3]\d\b/g);
+    if (yearMatches) yearMatches.forEach(y => years.add(y));
+    return years;
+}
+
+// Extract month-day combinations
+function extractMonthDay(text: string): Set<string> {
+    const dates = new Set<string>();
+    const lowerText = text.toLowerCase();
+    
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 
+                    'july', 'august', 'september', 'october', 'november', 'december'];
+    const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+                         'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    // Match "Month DD" or "Mon DD"
+    for (let i = 0; i < months.length; i++) {
+        const monthRegex = new RegExp(`(${months[i]}|${shortMonths[i]})[a-z]*\\.?\\s+(\\d{1,2})`, 'gi');
+        const matches = lowerText.match(monthRegex);
+        if (matches) {
+            matches.forEach(m => {
+                // Normalize to "month-day" format
+                const dayMatch = m.match(/\d{1,2}/);
+                if (dayMatch) {
+                    dates.add(`${shortMonths[i]}-${dayMatch[0]}`);
+                }
+            });
+        }
+    }
+    return dates;
+}
+
 function normalizeText(text: string): string {
     if (!text) return '';
     return text.toLowerCase()
@@ -108,6 +188,13 @@ function normalizeText(text: string): string {
         .replace(/elon musk/g, 'elon')
         .replace(/donald trump/g, 'trump')
         .replace(/joe biden/g, 'biden')
+        .replace(/kamala harris/g, 'harris')
+        .replace(/ron desantis/g, 'desantis')
+        .replace(/gavin newsom/g, 'newsom')
+        // Common variations
+        .replace(/become a trillionaire/g, 'trillionaire')
+        .replace(/become president/g, 'president')
+        .replace(/win the/g, 'win')
         // Formatting
         .replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ')
@@ -116,38 +203,83 @@ function normalizeText(text: string): string {
 
 /**
  * Calculate similarity score between two market questions
- * Uses Jaccard similarity + Entity Extraction + Date Matching + Key Topic Matching
+ * Enhanced algorithm with:
+ * - Critical entity matching (must match if present)
+ * - Year/date validation
+ * - Jaccard similarity
+ * - Key topic overlap
  */
 export function calculateSimilarity(question1: string, question2: string): number {
     const q1Norm = normalizeText(question1);
     const q2Norm = normalizeText(question2);
 
-    // 1. Jaccard on normalized text
+    // === CRITICAL ENTITY CHECK ===
+    // If both questions mention specific people/companies, they MUST match
+    const critical1 = extractCriticalEntities(question1);
+    const critical2 = extractCriticalEntities(question2);
+    
+    if (critical1.size > 0 && critical2.size > 0) {
+        const criticalIntersection = [...critical1].filter(e => critical2.has(e));
+        const criticalUnion = new Set([...critical1, ...critical2]);
+        
+        // If they mention different people/entities, heavily penalize
+        if (criticalIntersection.length === 0) {
+            return 0.1; // Almost no match - different subjects
+        }
+        
+        // If only partial overlap (e.g., one mentions Trump AND Biden, other only Trump)
+        // Still allow but with penalty
+        if (criticalIntersection.length < Math.min(critical1.size, critical2.size)) {
+            // Partial match - may be related but not same market
+        }
+    }
+
+    // === YEAR VALIDATION ===
+    // If both mention years, they should overlap
+    const years1 = extractYears(question1);
+    const years2 = extractYears(question2);
+    
+    if (years1.size > 0 && years2.size > 0) {
+        const yearIntersection = [...years1].filter(y => years2.has(y));
+        if (yearIntersection.length === 0) {
+            return 0.15; // Different time periods - not same market
+        }
+    }
+
+    // === DATE VALIDATION (Month-Day) ===
+    const dates1 = extractMonthDay(question1);
+    const dates2 = extractMonthDay(question2);
+    
+    let dateScore = 1.0;
+    if (dates1.size > 0 && dates2.size > 0) {
+        const dateIntersection = [...dates1].filter(d => dates2.has(d));
+        if (dateIntersection.length === 0) {
+            dateScore = 0.3; // Different specific dates
+        }
+    }
+
+    // === JACCARD SIMILARITY ===
     const words1 = new Set(q1Norm.split(' ').filter(w => w.length > 2));
     const words2 = new Set(q2Norm.split(' ').filter(w => w.length > 2));
 
     if (words1.size === 0 || words2.size === 0) return 0;
 
-    const intersection = [...words1].filter(w => words2.has(w)).length;
-    const union = new Set([...words1, ...words2]).size;
-    const jaccardScore = intersection / union;
+    const wordIntersection = [...words1].filter(w => words2.has(w)).length;
+    const wordUnion = new Set([...words1, ...words2]).size;
+    const jaccardScore = wordIntersection / wordUnion;
 
-    // 2. Entity Matching
+    // === ENTITY MATCHING ===
     const entities1 = extractEntities(question1);
     const entities2 = extractEntities(question2);
 
-    let entityScore = 0;
+    let entityScore = 0.5; // Neutral default
     if (entities1.size > 0 && entities2.size > 0) {
         const entityIntersection = [...entities1].filter(e => entities2.has(e)).length;
         const entityUnion = new Set([...entities1, ...entities2]).size;
         entityScore = entityIntersection / entityUnion;
-    } else if (entities1.size === 0 && entities2.size === 0) {
-        entityScore = 0.5; // Both have no entities, neutral
-    } else {
-        entityScore = 0; // One has entities, the other doesn't mismatch
     }
 
-    // 3. Key topic matching (important political/event topics)
+    // === KEY TOPIC MATCHING ===
     const topics1 = extractKeyTopics(question1);
     const topics2 = extractKeyTopics(question2);
 
@@ -155,62 +287,86 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     if (topics1.size > 0 && topics2.size > 0) {
         const topicIntersection = [...topics1].filter(t => topics2.has(t)).length;
         if (topicIntersection > 0) {
-            // If they share key topics, boost the score significantly
             topicScore = topicIntersection / Math.min(topics1.size, topics2.size);
         }
     }
 
-    // 3. Date Matching (heuristic: if both contain month names, they must match)
-    // Using simple string check for months
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const q1Months = months.filter(m => q1Norm.includes(m));
-    const q2Months = months.filter(m => q2Norm.includes(m));
-
-    let dateScore = 1;
-    if (q1Months.length > 0 && q2Months.length > 0) {
-        // If they share common months, full score. If disjoint sets of months, 0 score.
-        const commonMonths = q1Months.filter(m => q2Months.includes(m));
-        if (commonMonths.length === 0) {
-            dateScore = 0; // Critical mismatch!
+    // === EXACT PHRASE MATCHING ===
+    // Check for significant phrase overlap (3+ word sequences)
+    let exactPhraseScore = 0;
+    const words1Arr = q1Norm.split(' ');
+    for (let i = 0; i < words1Arr.length - 2; i++) {
+        const phrase = `${words1Arr[i]} ${words1Arr[i+1]} ${words1Arr[i+2]}`;
+        if (phrase.length > 8 && q2Norm.includes(phrase)) {
+            exactPhraseScore = 1.0;
+            break;
         }
     }
 
-    // Weighted Total
-    // If date mismatch, reduce the score significantly but don't kill it
-    if (dateScore === 0 && topicScore < 0.5) return 0;
+    // === WEIGHTED TOTAL ===
+    let totalScore = 
+        (jaccardScore * JACCARD_WEIGHT) + 
+        (entityScore * ENTITY_WEIGHT) + 
+        (dateScore * DATE_WEIGHT) + 
+        (topicScore * TOPIC_WEIGHT) +
+        (exactPhraseScore * EXACT_PHRASE_WEIGHT);
 
-    let totalScore = (jaccardScore * JACCARD_WEIGHT) + (entityScore * ENTITY_WEIGHT) + (dateScore * DATE_WEIGHT) + (topicScore * TOPIC_WEIGHT);
+    // Boost for very high Jaccard (near identical questions)
+    if (jaccardScore > 0.65) {
+        totalScore = Math.max(totalScore, 0.80);
+    }
 
-    // Boost for very high Jaccard (near identical)
-    if (jaccardScore > 0.7) totalScore = Math.max(totalScore, 0.85);
+    // Boost if they share multiple key topics AND critical entities
+    if (topicScore > 0.5 && critical1.size > 0 && critical2.size > 0) {
+        const criticalMatch = [...critical1].some(e => critical2.has(e));
+        if (criticalMatch) {
+            totalScore = Math.min(totalScore * 1.2, 1.0);
+        }
+    }
 
-    // Boost if they share multiple key topics
-    if (topicScore > 0.5) totalScore = Math.max(totalScore, totalScore * 1.3);
+    // Apply date penalty
+    totalScore *= dateScore;
 
-    return Math.min(totalScore, 1.0);
+    return Math.min(Math.max(totalScore, 0), 1.0);
 }
 
 /**
  * Find matching markets between Polymarket and Kalshi
+ * Enhanced to find the best match per Polymarket market (1:1 matching)
  */
 export function findMatchingMarkets(
     polymarketMarkets: NormalizedMarket[],
     kalshiMarkets: NormalizedMarket[],
-    similarityThreshold = 0.4
+    similarityThreshold = 0.55
 ): Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> {
     const matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> = [];
+    const usedKalshiIds = new Set<string>();
 
+    // For each Polymarket market, find the BEST matching Kalshi market
     for (const pm of polymarketMarkets) {
+        let bestMatch: { kalshi: NormalizedMarket; similarity: number } | null = null;
+        
         for (const km of kalshiMarkets) {
+            // Skip if this Kalshi market is already matched
+            if (usedKalshiIds.has(km.id)) continue;
+            
             const similarity = calculateSimilarity(pm.question, km.question);
 
             if (similarity >= similarityThreshold) {
-                matches.push({
-                    polymarket: pm,
-                    kalshi: km,
-                    similarity,
-                });
+                if (!bestMatch || similarity > bestMatch.similarity) {
+                    bestMatch = { kalshi: km, similarity };
+                }
             }
+        }
+        
+        // Add the best match if found
+        if (bestMatch) {
+            matches.push({
+                polymarket: pm,
+                kalshi: bestMatch.kalshi,
+                similarity: bestMatch.similarity,
+            });
+            usedKalshiIds.add(bestMatch.kalshi.id);
         }
     }
 

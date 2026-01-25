@@ -40,10 +40,10 @@ export default function HomePage() {
       setError(null);
 
       // Fetch from both platforms in parallel
-      // Increased limits to show more markets
+      // No limits - show all available markets
       const [polyRes, kalshiRes] = await Promise.all([
-        fetch('/api/markets?limit=100&order=volume24hr&ascending=false'),
-        fetch('/api/kalshi/markets?limit=200'),
+        fetch('/api/markets?limit=1000&order=volume24hr&ascending=false'),
+        fetch('/api/kalshi/markets?limit=1000'),
       ]);
 
       if (polyRes.ok) {

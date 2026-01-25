@@ -34,17 +34,17 @@ export async function GET() {
         // For Kalshi, we fetch both regular markets AND events with nested markets
         // Events contain more political/event-based markets that are comparable to Polymarket
         const [polymarketRes, kalshiMarketsRes, kalshiEventsRes] = await Promise.all([
-            // Fetch more markets for comprehensive coverage
-            fetch(`${GAMMA_API_BASE}/markets?limit=200&active=true&closed=false&enableOrderBook=true`, {
+            // Fetch ALL markets for comprehensive coverage
+            fetch(`${GAMMA_API_BASE}/markets?limit=1000&active=true&closed=false&enableOrderBook=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
-            fetch(`${KALSHI_API_BASE}/markets?limit=500&status=open`, {
+            fetch(`${KALSHI_API_BASE}/markets?limit=1000&status=open`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
             // Fetch events with nested markets for better coverage of political/event markets
-            fetch(`${KALSHI_API_BASE}/events?limit=200&status=open&with_nested_markets=true`, {
+            fetch(`${KALSHI_API_BASE}/events?limit=500&status=open&with_nested_markets=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
@@ -120,9 +120,9 @@ export async function GET() {
             .filter((m: NormalizedMarket | null): m is NormalizedMarket => m !== null && m.yesPrice > 0);
 
         // Find related markets across platforms
-        // Use moderate threshold (0.40) to find topically related markets
-        // Note: Exact same markets rarely exist across platforms due to different resolution criteria
-        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.40);
+        // Use higher threshold (0.55) to only show confidently related markets
+        // This reduces noise from loosely related topics
+        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.55);
 
         // Track matched IDs and deduplicate pairs
         const matchedPolyIds = new Set<string>();
