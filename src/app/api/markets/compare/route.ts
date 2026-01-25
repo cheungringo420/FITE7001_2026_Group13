@@ -123,16 +123,28 @@ export async function GET() {
         // Note: Exact same markets rarely exist across platforms due to different resolution criteria
         const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.40);
 
-        // Track matched IDs
+        // Track matched IDs and deduplicate pairs
         const matchedPolyIds = new Set<string>();
         const matchedKalshiIds = new Set<string>();
+        const seenPairs = new Set<string>(); // Track unique poly-kalshi title pairs
 
         // Build matched pairs with arbitrage detection
         // Only detect arbitrage for highly similar markets (>65% similarity)
         // to avoid false positives from topically related but different markets
         const ARBITRAGE_SIMILARITY_THRESHOLD = 0.65;
 
-        const matchedPairs: MatchedMarketPair[] = matches.map(match => {
+        const matchedPairs: MatchedMarketPair[] = [];
+
+        for (const match of matches) {
+            // Create a unique key based on question texts to avoid duplicates
+            // (Kalshi often has multiple markets with same title for different candidates)
+            const pairKey = `${match.polymarket.question}|||${match.kalshi.question}`;
+            
+            if (seenPairs.has(pairKey)) {
+                continue; // Skip duplicate pair
+            }
+            seenPairs.add(pairKey);
+
             matchedPolyIds.add(match.polymarket.id);
             matchedKalshiIds.add(match.kalshi.id);
 
@@ -142,14 +154,14 @@ export async function GET() {
                 ? detectArbitrage(match.polymarket, match.kalshi)
                 : null;
 
-            return {
+            matchedPairs.push({
                 id: `${match.polymarket.id}-${match.kalshi.id}`,
                 polymarket: match.polymarket,
                 kalshi: match.kalshi,
                 similarity: match.similarity,
                 arbitrage,
-            };
-        });
+            });
+        }
 
         // Get unmatched markets - sort by volume for relevance
         const unmatchedPolymarket = normalizedPolymarket
