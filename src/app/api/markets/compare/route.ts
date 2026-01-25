@@ -120,9 +120,9 @@ export async function GET() {
             .filter((m: NormalizedMarket | null): m is NormalizedMarket => m !== null && m.yesPrice > 0);
 
         // Find related markets across platforms
-        // Use higher threshold (0.55) to only show confidently related markets
-        // This reduces noise from loosely related topics
-        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.55);
+        // Use lower threshold (0.25) to return more potential matches
+        // Frontend will filter based on user-selected threshold
+        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.25);
 
         // Track matched IDs and deduplicate pairs
         const matchedPolyIds = new Set<string>();

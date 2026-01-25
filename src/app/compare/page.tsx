@@ -32,6 +32,7 @@ export default function ComparePage() {
     const [viewMode, setViewMode] = useState<ViewMode>('matched');
     const [showOnlyArbitrage, setShowOnlyArbitrage] = useState(false);
     const [selectedArbitrage, setSelectedArbitrage] = useState<ArbitrageOpportunity | null>(null);
+    const [similarityThreshold, setSimilarityThreshold] = useState(0.40); // Default 40%, user can adjust
 
     const fetchData = useCallback(async () => {
         try {
@@ -64,10 +65,12 @@ export default function ComparePage() {
         return () => clearInterval(interval);
     }, [autoRefresh, fetchData]);
 
-    const arbitrageCount = data?.matchedPairs.filter(p => p.arbitrage).length || 0;
+    // Filter pairs by user-selected similarity threshold
+    const thresholdFilteredPairs = data?.matchedPairs.filter(p => p.similarity >= similarityThreshold) || [];
+    const arbitrageCount = thresholdFilteredPairs.filter(p => p.arbitrage).length;
     const filteredPairs = showOnlyArbitrage 
-        ? data?.matchedPairs.filter(p => p.arbitrage) || []
-        : data?.matchedPairs || [];
+        ? thresholdFilteredPairs.filter(p => p.arbitrage)
+        : thresholdFilteredPairs;
 
     return (
         <div className="min-h-screen">
@@ -134,6 +137,77 @@ export default function ComparePage() {
                             Auto-refresh (30s)
                         </label>
                     </div>
+
+                    {/* Similarity Threshold Slider */}
+                    <div className="mt-6 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                </svg>
+                                <span className="text-white font-medium">Similarity Threshold</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-2xl font-bold ${
+                                    similarityThreshold >= 0.7 ? 'text-green-400' :
+                                    similarityThreshold >= 0.5 ? 'text-yellow-400' :
+                                    'text-orange-400'
+                                }`}>
+                                    {Math.round(similarityThreshold * 100)}%
+                                </span>
+                                <span className="text-slate-500 text-sm">
+                                    ({thresholdFilteredPairs.length} pairs)
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="relative">
+                            <input
+                                type="range"
+                                min="20"
+                                max="90"
+                                step="5"
+                                value={similarityThreshold * 100}
+                                onChange={(e) => setSimilarityThreshold(parseInt(e.target.value) / 100)}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+                                style={{
+                                    background: `linear-gradient(to right, 
+                                        rgb(249 115 22) 0%, 
+                                        rgb(234 179 8) 40%, 
+                                        rgb(34 197 94) 80%, 
+                                        rgb(34 197 94) 100%)`
+                                }}
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-2">
+                                <span>20% (More matches)</span>
+                                <span>90% (Exact matches only)</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {[
+                                { value: 0.30, label: '30%', desc: 'Loose' },
+                                { value: 0.40, label: '40%', desc: 'Related' },
+                                { value: 0.50, label: '50%', desc: 'Similar' },
+                                { value: 0.60, label: '60%', desc: 'Strong' },
+                                { value: 0.70, label: '70%', desc: 'Very Similar' },
+                                { value: 0.80, label: '80%', desc: 'Near Exact' },
+                            ].map((preset) => (
+                                <button
+                                    key={preset.value}
+                                    onClick={() => setSimilarityThreshold(preset.value)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        Math.abs(similarityThreshold - preset.value) < 0.05
+                                            ? 'bg-purple-500 text-white'
+                                            : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                    }`}
+                                >
+                                    {preset.label}
+                                    <span className="ml-1 opacity-70">{preset.desc}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -143,7 +217,12 @@ export default function ComparePage() {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
                             <div className="text-sm text-slate-400 mb-1">Related Pairs</div>
-                            <div className="text-2xl font-bold text-white">{data.matchedPairs.length}</div>
+                            <div className="text-2xl font-bold text-white">
+                                {thresholdFilteredPairs.length}
+                                <span className="text-sm text-slate-500 font-normal ml-1">
+                                    / {data.matchedPairs.length}
+                                </span>
+                            </div>
                         </div>
                         <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-4 border border-green-500/30">
                             <div className="text-sm text-green-400 mb-1">Arbitrage Found</div>

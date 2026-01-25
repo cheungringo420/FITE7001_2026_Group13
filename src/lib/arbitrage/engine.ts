@@ -9,7 +9,7 @@ import { ParsedMarket } from '../polymarket/types';
 export function normalizePolymarketMarket(market: ParsedMarket): NormalizedMarket {
     // Build Polymarket URL - prefer event slug if available, otherwise use market slug
     const eventSlug = market.events?.[0]?.slug;
-    const polymarketUrl = eventSlug 
+    const polymarketUrl = eventSlug
         ? `https://polymarket.com/event/${eventSlug}`
         : `https://polymarket.com/event/${market.slug}`;
 
@@ -74,7 +74,7 @@ const KEY_TOPICS = [
 function extractCriticalEntities(text: string): Set<string> {
     const lowerText = text.toLowerCase();
     const found = new Set<string>();
-    
+
     for (const entity of CRITICAL_ENTITIES) {
         if (lowerText.includes(entity)) {
             // Normalize similar entities
@@ -148,12 +148,12 @@ function extractYears(text: string): Set<string> {
 function extractMonthDay(text: string): Set<string> {
     const dates = new Set<string>();
     const lowerText = text.toLowerCase();
-    
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 
-                    'july', 'august', 'september', 'october', 'november', 'december'];
-    const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
-                         'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    
+
+    const months = ['january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'];
+    const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
+        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
     // Match "Month DD" or "Mon DD"
     for (let i = 0; i < months.length; i++) {
         const monthRegex = new RegExp(`(${months[i]}|${shortMonths[i]})[a-z]*\\.?\\s+(\\d{1,2})`, 'gi');
@@ -217,16 +217,16 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     // If both questions mention specific people/companies, they MUST match
     const critical1 = extractCriticalEntities(question1);
     const critical2 = extractCriticalEntities(question2);
-    
+
     if (critical1.size > 0 && critical2.size > 0) {
         const criticalIntersection = [...critical1].filter(e => critical2.has(e));
         const criticalUnion = new Set([...critical1, ...critical2]);
-        
+
         // If they mention different people/entities, heavily penalize
         if (criticalIntersection.length === 0) {
             return 0.1; // Almost no match - different subjects
         }
-        
+
         // If only partial overlap (e.g., one mentions Trump AND Biden, other only Trump)
         // Still allow but with penalty
         if (criticalIntersection.length < Math.min(critical1.size, critical2.size)) {
@@ -238,7 +238,7 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     // If both mention years, they should overlap
     const years1 = extractYears(question1);
     const years2 = extractYears(question2);
-    
+
     if (years1.size > 0 && years2.size > 0) {
         const yearIntersection = [...years1].filter(y => years2.has(y));
         if (yearIntersection.length === 0) {
@@ -249,7 +249,7 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     // === DATE VALIDATION (Month-Day) ===
     const dates1 = extractMonthDay(question1);
     const dates2 = extractMonthDay(question2);
-    
+
     let dateScore = 1.0;
     if (dates1.size > 0 && dates2.size > 0) {
         const dateIntersection = [...dates1].filter(d => dates2.has(d));
@@ -296,7 +296,7 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     let exactPhraseScore = 0;
     const words1Arr = q1Norm.split(' ');
     for (let i = 0; i < words1Arr.length - 2; i++) {
-        const phrase = `${words1Arr[i]} ${words1Arr[i+1]} ${words1Arr[i+2]}`;
+        const phrase = `${words1Arr[i]} ${words1Arr[i + 1]} ${words1Arr[i + 2]}`;
         if (phrase.length > 8 && q2Norm.includes(phrase)) {
             exactPhraseScore = 1.0;
             break;
@@ -304,10 +304,10 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     }
 
     // === WEIGHTED TOTAL ===
-    let totalScore = 
-        (jaccardScore * JACCARD_WEIGHT) + 
-        (entityScore * ENTITY_WEIGHT) + 
-        (dateScore * DATE_WEIGHT) + 
+    let totalScore =
+        (jaccardScore * JACCARD_WEIGHT) +
+        (entityScore * ENTITY_WEIGHT) +
+        (dateScore * DATE_WEIGHT) +
         (topicScore * TOPIC_WEIGHT) +
         (exactPhraseScore * EXACT_PHRASE_WEIGHT);
 
@@ -337,7 +337,7 @@ export function calculateSimilarity(question1: string, question2: string): numbe
 export function findMatchingMarkets(
     polymarketMarkets: NormalizedMarket[],
     kalshiMarkets: NormalizedMarket[],
-    similarityThreshold = 0.55
+    similarityThreshold = 0.25
 ): Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> {
     const matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> = [];
     const usedKalshiIds = new Set<string>();
@@ -345,11 +345,11 @@ export function findMatchingMarkets(
     // For each Polymarket market, find the BEST matching Kalshi market
     for (const pm of polymarketMarkets) {
         let bestMatch: { kalshi: NormalizedMarket; similarity: number } | null = null;
-        
+
         for (const km of kalshiMarkets) {
             // Skip if this Kalshi market is already matched
             if (usedKalshiIds.has(km.id)) continue;
-            
+
             const similarity = calculateSimilarity(pm.question, km.question);
 
             if (similarity >= similarityThreshold) {
@@ -358,7 +358,7 @@ export function findMatchingMarkets(
                 }
             }
         }
-        
+
         // Add the best match if found
         if (bestMatch) {
             matches.push({
