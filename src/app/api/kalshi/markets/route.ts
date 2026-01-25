@@ -69,21 +69,32 @@ export async function GET(request: Request) {
             .filter(m => {
                 const title = m.title?.toLowerCase() || '';
                 
+                // Must have a title
+                if (!title || title.length < 10) return false;
+
                 // Filter out sports stats markets
-                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown/i.test(title);
-                
-                // Filter out parlay/multi-leg sports bets (titles starting with "yes " followed by team names)
-                const isParlay = /^yes\s+[a-z]/i.test(title) || title.includes(',yes ');
-                
-                // Filter out markets with sports team patterns
-                const hasSportsTeams = /\b(ducks|maple leafs|blackhawks|devils|canucks|golden knights|lakers|celtics|warriors|bulls|heat|nets|knicks|clippers|mavericks|suns|nuggets|bucks|76ers|raptors|spurs|rockets|pistons|pacers|magic|hornets|hawks|cavaliers|wizards|grizzlies|pelicans|timberwolves|thunder|trail blazers|kings|jazz)\b/i.test(title);
-                
-                // Filter out markets with no real price data (50/50 default)
-                const hasDefaultPrice = m.yes_bid === 50 && m.volume === 0;
-                
+                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
+
+                // Filter out parlay/multi-leg bets (titles with comma-separated names)
+                // These look like "yes TeamA,yes TeamB" or "no PlayerA,no PlayerB"
+                const isParlay = /^(yes|no)\s+[a-z]/i.test(title) || /,(yes|no)\s+/i.test(title);
+
+                // Filter out player-specific sports bets (contains player names with "no" or "yes" prefix)
+                const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
+
+                // Valid markets typically:
+                // - Start with "Will" or contain "?"
+                // - Don't start with "yes " or "no "
+                const looksLikeQuestion = /^will\s|will\s.*\?|\?$/i.test(title) || 
+                                          /^(what|who|when|how|which)/i.test(title);
+                const startsWithYesNo = /^(yes|no)\s/i.test(title);
+
                 const isActive = m.status === 'open' || m.status === 'active';
                 
-                return isActive && !isSportsStats && !isParlay && !hasSportsTeams && !hasDefaultPrice;
+                // Accept if it looks like a question OR doesn't start with yes/no and passes other filters
+                const isValidFormat = looksLikeQuestion || (!startsWithYesNo && !isParlay && !isPlayerBet);
+
+                return isActive && !isSportsStats && isValidFormat;
             })
             .map(m => {
                 try {

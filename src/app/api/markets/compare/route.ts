@@ -126,22 +126,30 @@ export async function GET() {
             .filter(m => {
                 const title = m.title?.toLowerCase() || '';
                 
-                // Filter out short-term sports markets (usually have very specific player names/stats)
-                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown/i.test(title);
+                // Must have a title
+                if (!title || title.length < 10) return false;
                 
-                // Filter out parlay/multi-leg sports bets (titles starting with "yes " followed by team names)
-                const isParlay = /^yes\s+[a-z]/i.test(title) || title.includes(',yes ');
+                // Filter out sports stats markets
+                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
                 
-                // Filter out markets with sports team patterns
-                const hasSportsTeams = /\b(ducks|maple leafs|blackhawks|devils|canucks|golden knights|lakers|celtics|warriors|bulls|heat|nets|knicks|clippers|mavericks|suns|nuggets|bucks|76ers|raptors|spurs|rockets|pistons|pacers|magic|hornets|hawks|cavaliers|wizards|grizzlies|pelicans|timberwolves|thunder|trail blazers|kings|jazz)\b/i.test(title);
+                // Filter out parlay/multi-leg bets
+                const isParlay = /^(yes|no)\s+[a-z]/i.test(title) || /,(yes|no)\s+/i.test(title);
                 
-                // Filter out markets with no real price data (50/50 default with 0 volume)
-                const hasDefaultPrice = m.yes_bid === 50 && m.volume === 0;
+                // Filter out player-specific sports bets
+                const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
+                
+                // Valid markets typically look like questions
+                const looksLikeQuestion = /^will\s|will\s.*\?|\?$/i.test(title) || 
+                                          /^(what|who|when|how|which)/i.test(title);
+                const startsWithYesNo = /^(yes|no)\s/i.test(title);
                 
                 // Kalshi uses 'active' or 'open' for open markets
                 const isOpen = m.status === 'open' || m.status === 'active';
                 
-                return isOpen && !isSportsStats && !isParlay && !hasSportsTeams && !hasDefaultPrice;
+                // Accept if it looks like a question OR doesn't start with yes/no
+                const isValidFormat = looksLikeQuestion || (!startsWithYesNo && !isParlay && !isPlayerBet);
+                
+                return isOpen && !isSportsStats && isValidFormat;
             })
             .map((m: KalshiMarket) => {
                 try {
