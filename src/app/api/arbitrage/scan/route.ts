@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseMarket, Market } from '@/lib/polymarket';
-import { normalizeKalshiMarket, KalshiMarket } from '@/lib/kalshi';
+import { fetchAndNormalizeKalshiMarkets } from '@/lib/kalshi';
 import {
     normalizePolymarketMarket,
     findMatchingMarkets,
@@ -10,28 +10,23 @@ import {
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
 
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
-const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 export async function GET() {
     try {
         // Fetch markets from both platforms in parallel
-        const [polymarketRes, kalshiRes] = await Promise.all([
-            fetch(`${GAMMA_API_BASE}/markets?limit=100&active=true&enableOrderBook=true`, {
+        const [polymarketRes, normalizedKalshi] = await Promise.all([
+            fetch(`${GAMMA_API_BASE}/markets?limit=100&active=true&closed=false&enableOrderBook=true`, {
                 headers: { 'Accept': 'application/json' },
                 next: { revalidate: 60 },
             }),
-            fetch(`${KALSHI_API_BASE}/markets?limit=100&status=open`, {
-                headers: { 'Accept': 'application/json' },
-                next: { revalidate: 60 },
-            }),
+            fetchAndNormalizeKalshiMarkets(100)
         ]);
 
-        if (!polymarketRes.ok || !kalshiRes.ok) {
+        if (!polymarketRes.ok) {
             throw new Error('Failed to fetch from one or more platforms');
         }
 
         const polymarketData: Market[] = await polymarketRes.json();
-        const kalshiData = await kalshiRes.json();
 
         // Normalize markets
         const normalizedPolymarket: NormalizedMarket[] = polymarketData
@@ -44,15 +39,7 @@ export async function GET() {
             })
             .filter((m): m is NormalizedMarket => m !== null);
 
-        const normalizedKalshi: NormalizedMarket[] = (kalshiData.markets || [])
-            .map((m: KalshiMarket) => {
-                try {
-                    return normalizeKalshiMarket(m);
-                } catch {
-                    return null;
-                }
-            })
-            .filter((m: NormalizedMarket | null): m is NormalizedMarket => m !== null);
+        // Kalshi markets are already normalized by the helper
 
         // Find matching markets across platforms
         const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.35);

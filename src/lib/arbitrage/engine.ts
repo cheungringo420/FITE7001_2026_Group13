@@ -55,6 +55,10 @@ const CRITICAL_ENTITIES = [
     'tesla', 'spacex', 'openai', 'anthropic', 'google', 'meta', 'apple', 'nvidia',
     // Specific events
     'super bowl', 'oscars', 'grammy', 'world cup',
+    // Countries/regions (critical for office-holder markets)
+    'china', 'taiwan', 'israel', 'iran', 'netherlands', 'ukraine', 'russia',
+    'united states', 'us', 'canada', 'mexico', 'uk', 'england', 'scotland',
+    'germany', 'france', 'italy', 'spain', 'japan', 'korea', 'india',
 ];
 
 // Key topics that indicate related markets
@@ -68,6 +72,14 @@ const KEY_TOPICS = [
     'tariff', 'trade war',
     'trillionaire', 'billionaire',
     'doge', 'budget', 'deficit',
+];
+
+const COUNTRIES = [
+    'china', 'taiwan', 'israel', 'iran', 'netherlands', 'ukraine', 'russia',
+    'united states', 'us', 'canada', 'mexico', 'uk', 'england', 'scotland',
+    'germany', 'france', 'italy', 'spain', 'japan', 'korea', 'india',
+    'australia', 'new zealand', 'brazil', 'argentina', 'south africa',
+    'saudi arabia', 'uae', 'qatar',
 ];
 
 // Extract critical entities (person names, companies) that MUST match
@@ -134,6 +146,34 @@ function extractKeyTopics(text: string): Set<string> {
         }
     }
     return found;
+}
+
+function extractCountries(text: string): Set<string> {
+    const lowerText = text.toLowerCase();
+    const found = new Set<string>();
+    for (const country of COUNTRIES) {
+        if (lowerText.includes(country)) {
+            found.add(country === 'united states' ? 'us' : country);
+        }
+    }
+    return found;
+}
+
+function extractOfficeTargets(text: string): Set<string> {
+    const lower = text.toLowerCase();
+    const targets = new Set<string>();
+    const officeRegex = /\b(prime minister|president|chancellor|leader|governor|mayor|speaker|supreme leader)\b.*?\b(of|in|for)\b\s+([a-z\s]+)/i;
+    const match = lower.match(officeRegex);
+    if (match) {
+        const office = match[1].replace(/\s+/g, ' ');
+        const countryPart = match[3].split('?')[0].trim();
+        for (const country of COUNTRIES) {
+            if (countryPart.includes(country)) {
+                targets.add(`${office}:${country === 'united states' ? 'us' : country}`);
+            }
+        }
+    }
+    return targets;
 }
 
 // Extract years mentioned in text
@@ -220,17 +260,34 @@ export function calculateSimilarity(question1: string, question2: string): numbe
 
     if (critical1.size > 0 && critical2.size > 0) {
         const criticalIntersection = [...critical1].filter(e => critical2.has(e));
-        const criticalUnion = new Set([...critical1, ...critical2]);
-
-        // If they mention different people/entities, heavily penalize
+        // If they mention different people/entities, invalid match
         if (criticalIntersection.length === 0) {
-            return 0.1; // Almost no match - different subjects
+            return 0; // HARD REJECTION - different subjects
         }
 
         // If only partial overlap (e.g., one mentions Trump AND Biden, other only Trump)
         // Still allow but with penalty
         if (criticalIntersection.length < Math.min(critical1.size, critical2.size)) {
             // Partial match - may be related but not same market
+        }
+    }
+
+    // === COUNTRY/OFFICE VALIDATION ===
+    const countries1 = extractCountries(question1);
+    const countries2 = extractCountries(question2);
+    if (countries1.size > 0 && countries2.size > 0) {
+        const countryIntersection = [...countries1].filter(c => countries2.has(c));
+        if (countryIntersection.length === 0) {
+            return 0.05; // Different countries
+        }
+    }
+
+    const officeTargets1 = extractOfficeTargets(question1);
+    const officeTargets2 = extractOfficeTargets(question2);
+    if (officeTargets1.size > 0 && officeTargets2.size > 0) {
+        const officeIntersection = [...officeTargets1].filter(o => officeTargets2.has(o));
+        if (officeIntersection.length === 0) {
+            return 0.05; // Different office + country
         }
     }
 
@@ -242,7 +299,7 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     if (years1.size > 0 && years2.size > 0) {
         const yearIntersection = [...years1].filter(y => years2.has(y));
         if (yearIntersection.length === 0) {
-            return 0.15; // Different time periods - not same market
+            return 0.05; // Different time periods - distinct markets
         }
     }
 
@@ -250,12 +307,17 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     const dates1 = extractMonthDay(question1);
     const dates2 = extractMonthDay(question2);
 
-    let dateScore = 1.0;
+    let dateScore = 0.5; // Neutral start (was 1.0 which caused false positives)
     if (dates1.size > 0 && dates2.size > 0) {
         const dateIntersection = [...dates1].filter(d => dates2.has(d));
-        if (dateIntersection.length === 0) {
-            dateScore = 0.3; // Different specific dates
+        if (dateIntersection.length > 0) {
+            dateScore = 1.0;
+        } else {
+            return 0.2; // Distinct specific dates = different market
         }
+    } else if (years1.size > 0 && years2.size > 0) {
+        // Fallback to year match if no specific dates
+        dateScore = 0.8;
     }
 
     // === JACCARD SIMILARITY ===
@@ -272,11 +334,13 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     const entities1 = extractEntities(question1);
     const entities2 = extractEntities(question2);
 
-    let entityScore = 0.5; // Neutral default
+    let entityScore = 0; // Default to 0 (no similarity) was 0.5
     if (entities1.size > 0 && entities2.size > 0) {
         const entityIntersection = [...entities1].filter(e => entities2.has(e)).length;
         const entityUnion = new Set([...entities1, ...entities2]).size;
         entityScore = entityIntersection / entityUnion;
+    } else if (entities1.size === 0 && entities2.size === 0) {
+        entityScore = 0.5; // Both empty = neutral
     }
 
     // === KEY TOPIC MATCHING ===
@@ -284,10 +348,14 @@ export function calculateSimilarity(question1: string, question2: string): numbe
     const topics2 = extractKeyTopics(question2);
 
     let topicScore = 0;
+    let topicMismatch = false;
+
     if (topics1.size > 0 && topics2.size > 0) {
         const topicIntersection = [...topics1].filter(t => topics2.has(t)).length;
         if (topicIntersection > 0) {
             topicScore = topicIntersection / Math.min(topics1.size, topics2.size);
+        } else {
+            topicMismatch = true; // Topics found but completely different
         }
     }
 
@@ -316,16 +384,15 @@ export function calculateSimilarity(question1: string, question2: string): numbe
         totalScore = Math.max(totalScore, 0.80);
     }
 
-    // Boost if they share multiple key topics AND critical entities
-    if (topicScore > 0.5 && critical1.size > 0 && critical2.size > 0) {
-        const criticalMatch = [...critical1].some(e => critical2.has(e));
-        if (criticalMatch) {
-            totalScore = Math.min(totalScore * 1.2, 1.0);
-        }
+    // Penalty for topic mismatch (e.g., 'tariff' vs 'ai')
+    if (topicMismatch) {
+        totalScore *= 0.5;
     }
 
-    // Apply date penalty
-    totalScore *= dateScore;
+    // Hard penalty for very low word overlap if no strong signals
+    if (jaccardScore < 0.15 && topicScore < 0.5 && entityScore < 0.2) {
+        totalScore *= 0.5;
+    }
 
     return Math.min(Math.max(totalScore, 0), 1.0);
 }
@@ -437,12 +504,14 @@ export function detectArbitrage(
             marketId: market1.id,
             yesPrice: market1.yesPrice,
             noPrice: market1.noPrice,
+            url: market1.url,
         },
         platform2: {
             name: market2.platform,
             marketId: market2.id,
             yesPrice: market2.yesPrice,
             noPrice: market2.noPrice,
+            url: market2.url,
         },
         profitPercentage,
         totalCost: bestCost,
@@ -505,12 +574,14 @@ export function detectSinglePlatformArbitrage(market: NormalizedMarket): Arbitra
             marketId: market.id,
             yesPrice: market.yesPrice,
             noPrice: market.noPrice,
+            url: market.url,
         },
         platform2: {
             name: market.platform,
             marketId: market.id,
             yesPrice: market.yesPrice,
             noPrice: market.noPrice,
+            url: market.url,
         },
         profitPercentage,
         totalCost,

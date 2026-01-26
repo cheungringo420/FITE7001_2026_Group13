@@ -112,12 +112,14 @@ export interface ArbitrageOpportunity {
         marketId: string;
         yesPrice: number;
         noPrice: number;
+        url?: string;
     };
     platform2: {
         name: 'polymarket' | 'kalshi';
         marketId: string;
         yesPrice: number;
         noPrice: number;
+        url?: string;
     };
     profitPercentage: number;
     totalCost: number; // Cost to buy both positions

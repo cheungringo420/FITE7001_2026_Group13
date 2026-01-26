@@ -189,7 +189,8 @@ export function normalizeKalshiMarket(market: KalshiMarket): NormalizedMarket {
     return {
         id: market.ticker,
         platform: 'kalshi',
-        question: market.title,
+        // Clean title: "yes Seattle" -> "Seattle"
+        question: market.title.replace(/^(yes|no)\s+/i, ''),
         description: market.subtitle,
         category: market.category,
         yesPrice,
@@ -241,4 +242,125 @@ export function convertKalshiOrderBook(orderbook: KalshiOrderBook): {
     }));
 
     return { bids, asks };
+}
+
+/**
+ * Robustly fetch and normalize Kalshi markets
+ * Fetches from multiple endpoints and strictly filters out invalid/sports markets
+ */
+export async function fetchAndNormalizeKalshiMarkets(limit = 100): Promise<NormalizedMarket[]> {
+    try {
+        const allMarkets: KalshiMarket[] = [];
+        const seenTickers = new Set<string>();
+
+        const addMarkets = (markets: KalshiMarket[]) => {
+            for (const m of markets) {
+                if (m.ticker && !seenTickers.has(m.ticker)) {
+                    seenTickers.add(m.ticker);
+                    allMarkets.push(m);
+                }
+            }
+        };
+
+        const fetchMarketsPaged = async (status?: string, maxItems = 2000) => {
+            let cursor: string | undefined;
+            let fetched = 0;
+            const pageLimit = 1000;
+
+            while (fetched < maxItems) {
+                const params = new URLSearchParams();
+                params.set('limit', pageLimit.toString());
+                if (status) params.set('status', status);
+                if (cursor) params.set('cursor', cursor);
+
+                const res = await fetch(`${KALSHI_API_BASE}/markets?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' },
+                    next: { revalidate: 30 },
+                });
+
+                if (!res.ok) break;
+                const data = await res.json();
+                const markets = data.markets || [];
+                addMarkets(markets);
+                fetched += markets.length;
+                cursor = data.cursor;
+                if (!cursor || markets.length === 0) break;
+            }
+        };
+
+        const fetchEventsPaged = async (maxItems = 2000) => {
+            let cursor: string | undefined;
+            let fetched = 0;
+            const pageLimit = 500;
+
+            while (fetched < maxItems) {
+                const params = new URLSearchParams();
+                params.set('limit', pageLimit.toString());
+                params.set('with_nested_markets', 'true');
+                if (cursor) params.set('cursor', cursor);
+
+                const res = await fetch(`${KALSHI_API_BASE}/events?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' },
+                    next: { revalidate: 30 },
+                });
+
+                if (!res.ok) break;
+                const data = await res.json();
+                const events: KalshiEvent[] = data.events || [];
+                for (const event of events) {
+                    if (event.markets) {
+                        addMarkets(event.markets);
+                        fetched += event.markets.length;
+                    }
+                }
+                cursor = data.cursor;
+                if (!cursor || events.length === 0) break;
+            }
+        };
+
+        // Fetch from multiple endpoints and paginate
+        await Promise.all([
+            fetchMarketsPaged(), // no status filter
+            fetchMarketsPaged('active'),
+            fetchMarketsPaged('open'),
+            fetchEventsPaged(),
+        ]);
+
+        if (allMarkets.length === 0) {
+            console.log('Kalshi API: No markets found from any endpoint');
+            return [];
+        }
+
+        // Filter out invalid/parlay markets while keeping valid sports + finance questions
+        const normalizedMarkets = allMarkets
+            .filter(m => {
+                const title = m.title?.toLowerCase() || '';
+                if (!title || title.length < 10) return false;
+
+                const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
+                const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
+                const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
+
+                const looksLikeQuestion = /^will\s|\\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
+                const isActive = m.status === 'open' || m.status === 'active';
+
+                return isActive && !isSportsStats && !isParlay && !isPlayerBet && looksLikeQuestion;
+            })
+            .map(m => {
+                try {
+                    return normalizeKalshiMarket(m);
+                } catch (e) {
+                    console.error(`Failed to normalize market ${m.ticker}:`, e);
+                    return null;
+                }
+            })
+            .filter((m): m is NormalizedMarket => m !== null && m.yesPrice > 0)
+            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+            .slice(0, limit);
+
+        return normalizedMarkets;
+    } catch (error) {
+        console.error('Error fetching Kalshi markets:', error);
+        return [];
+    }
 }

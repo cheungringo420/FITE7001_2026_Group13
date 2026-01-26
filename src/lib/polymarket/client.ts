@@ -87,7 +87,7 @@ export async function searchMarkets(query: string, limit: number = 20): Promise<
     // The Gamma API doesn't have a direct search endpoint,
     // so we fetch markets and filter client-side
     // In production, you might use a search service
-    const markets = await fetchMarkets({ limit: 100, active: true });
+    const markets = await fetchMarkets({ limit: 100, active: true, closed: false });
 
     const lowerQuery = query.toLowerCase();
     return markets
