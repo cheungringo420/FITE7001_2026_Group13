@@ -326,37 +326,94 @@ export async function fetchAndNormalizeKalshiMarkets(limit = 100): Promise<Norma
             fetchEventsPaged(),
         ]);
 
+        const fallbackFromEvents = async () => {
+            try {
+                const res = await fetch(`${KALSHI_API_BASE}/events?limit=200&with_nested_markets=true`, {
+                    headers: { 'Accept': 'application/json' },
+                    next: { revalidate: 30 },
+                });
+                if (!res.ok) return [];
+                const data = await res.json();
+                const events: KalshiEvent[] = data.events || [];
+                const markets: KalshiMarket[] = [];
+                for (const event of events) {
+                    if (event.markets) {
+                        markets.push(...event.markets);
+                    }
+                }
+                return markets;
+            } catch {
+                return [];
+            }
+        };
+
         if (allMarkets.length === 0) {
-            console.log('Kalshi API: No markets found from any endpoint');
-            return [];
+            console.log('Kalshi API: No markets found from paged endpoints, using fallback events fetch');
+            const fallbackMarkets = await fallbackFromEvents();
+            if (fallbackMarkets.length === 0) return [];
+            fallbackMarkets.forEach(m => addMarkets([m]));
         }
 
         // Filter out invalid/parlay markets while keeping valid sports + finance questions
-        const normalizedMarkets = allMarkets
-            .filter(m => {
+        const normalizeList = (markets: KalshiMarket[]) =>
+            markets
+                .map(m => {
+                    try {
+                        return normalizeKalshiMarket(m);
+                    } catch (e) {
+                        console.error(`Failed to normalize market ${m.ticker}:`, e);
+                        return null;
+                    }
+                })
+                .filter((m): m is NormalizedMarket => m !== null && m.yesPrice > 0)
+                .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+                .slice(0, limit);
+
+        const primaryFiltered = allMarkets.filter(m => {
+            const title = m.title?.toLowerCase() || '';
+            if (!title || title.length < 10) return false;
+
+            const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
+            const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
+            const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
+
+            const looksLikeQuestion = /^will\s|\\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
+            const isActive = m.status === 'open' || m.status === 'active';
+
+            return isActive && !isSportsStats && !isParlay && !isPlayerBet && looksLikeQuestion;
+        });
+
+        let normalizedMarkets = normalizeList(primaryFiltered);
+
+        // Fallback: if too strict, relax to show valid markets (still avoid parlays/stats)
+        if (normalizedMarkets.length === 0) {
+            const relaxedFiltered = allMarkets.filter(m => {
                 const title = m.title?.toLowerCase() || '';
-                if (!title || title.length < 10) return false;
+                if (!title || title.length < 6) return false;
 
                 const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
                 const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
-                const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
-
-                const looksLikeQuestion = /^will\s|\\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
                 const isActive = m.status === 'open' || m.status === 'active';
 
-                return isActive && !isSportsStats && !isParlay && !isPlayerBet && looksLikeQuestion;
-            })
-            .map(m => {
-                try {
-                    return normalizeKalshiMarket(m);
-                } catch (e) {
-                    console.error(`Failed to normalize market ${m.ticker}:`, e);
-                    return null;
-                }
-            })
-            .filter((m): m is NormalizedMarket => m !== null && m.yesPrice > 0)
-            .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
-            .slice(0, limit);
+                return isActive && !isSportsStats && !isParlay;
+            });
+            normalizedMarkets = normalizeList(relaxedFiltered);
+        }
+
+        if (normalizedMarkets.length === 0) {
+            const fallbackMarkets = await fallbackFromEvents();
+            if (fallbackMarkets.length > 0) {
+                const relaxedFiltered = fallbackMarkets.filter(m => {
+                    const title = m.title?.toLowerCase() || '';
+                    if (!title || title.length < 6) return false;
+                    const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
+                    const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
+                    const isActive = m.status === 'open' || m.status === 'active';
+                    return isActive && !isSportsStats && !isParlay;
+                });
+                normalizedMarkets = normalizeList(relaxedFiltered);
+            }
+        }
 
         return normalizedMarkets;
     } catch (error) {
