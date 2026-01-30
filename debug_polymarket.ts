@@ -14,7 +14,7 @@ async function debugPolymarket() {
         console.log(`Fetched ${markets.length} markets`);
 
         // Log details for the first 5
-        markets.slice(0, 5).forEach((m, i) => {
+        markets.slice(0, 5).forEach((m: { question: string; slug: string; active: boolean; closed: boolean; events?: Array<{ id: string; slug: string }> }, i: number) => {
             console.log(`\nMarket #${i + 1}:`);
             console.log(`Question: ${m.question}`);
             console.log(`Slug: ${m.slug}`);

@@ -4,6 +4,7 @@ import { fetchAndNormalizeKalshiMarkets } from '@/lib/kalshi';
 import {
     normalizePolymarketMarket,
     findMatchingMarkets,
+    findMatchingMarketsAsync,
     detectArbitrage,
 } from '@/lib/arbitrage';
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
@@ -25,6 +26,7 @@ export interface CompareResponse {
     polymarketCount: number;
     kalshiCount: number;
     fetchedAt: string;
+    matchingMethod: 'semantic' | 'text';  // Indicates which matching algorithm was used
 }
 
 export async function GET() {
@@ -57,12 +59,16 @@ export async function GET() {
             .filter((m): m is NormalizedMarket => m !== null && m.yesPrice > 0);
 
         // Kalshi markets are already normalized by the helper
-        // ... (rest of the file matches logic)
 
-        // Find related markets across platforms
-        // Use lower threshold (0.25) to return more potential matches
-        // Frontend will filter based on user-selected threshold
-        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.25);
+        // Find related markets across platforms using semantic matching
+        // Uses OpenAI embeddings for better accuracy, falls back to text matching
+        const { matches, matchingMethod } = await findMatchingMarketsAsync(
+            normalizedPolymarket,
+            normalizedKalshi,
+            0.30  // Use moderate threshold for semantic matching
+        );
+
+        console.log(`[Compare] Using ${matchingMethod} matching, found ${matches.length} potential matches`);
 
         // Track matched IDs and deduplicate pairs
         const matchedPolyIds = new Set<string>();
@@ -129,6 +135,7 @@ export async function GET() {
             polymarketCount: normalizedPolymarket.length,
             kalshiCount: normalizedKalshi.length,
             fetchedAt: new Date().toISOString(),
+            matchingMethod,  // 'semantic' or 'text'
         };
 
         return NextResponse.json(response);

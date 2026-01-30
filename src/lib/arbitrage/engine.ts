@@ -2,6 +2,7 @@
 
 import { NormalizedMarket, ArbitrageOpportunity } from '../kalshi/types';
 import { ParsedMarket } from '../polymarket/types';
+import { getEmbeddings, cosineSimilarity, prewarmCache } from '../ai/embeddings';
 
 /**
  * Normalize a Polymarket market to cross-platform format
@@ -439,6 +440,190 @@ export function findMatchingMarkets(
 
     // Sort by similarity descending
     return matches.sort((a, b) => b.similarity - a.similarity);
+}
+
+// --- Semantic Matching (OpenAI Embeddings) ---
+
+// Hybrid matching weights
+const SEMANTIC_WEIGHT = 0.60;  // 60% weight on semantic similarity
+const VALIDATION_WEIGHT = 0.40; // 40% weight on entity/date validation
+
+/**
+ * Calculate a validation score based on entity, date, and country matching
+ * This acts as a filter/adjustment to semantic similarity
+ * Returns 0 if hard rejection (different entities/dates), otherwise 0-1
+ */
+function calculateValidationScore(question1: string, question2: string): number {
+    // === CRITICAL ENTITY CHECK ===
+    const critical1 = extractCriticalEntities(question1);
+    const critical2 = extractCriticalEntities(question2);
+
+    if (critical1.size > 0 && critical2.size > 0) {
+        const criticalIntersection = [...critical1].filter(e => critical2.has(e));
+        // If they mention different people/entities, invalid match
+        if (criticalIntersection.length === 0) {
+            return 0; // HARD REJECTION - different subjects
+        }
+    }
+
+    // === COUNTRY VALIDATION ===
+    const countries1 = extractCountries(question1);
+    const countries2 = extractCountries(question2);
+    if (countries1.size > 0 && countries2.size > 0) {
+        const countryIntersection = [...countries1].filter(c => countries2.has(c));
+        if (countryIntersection.length === 0) {
+            return 0.1; // Different countries - low validation
+        }
+    }
+
+    // === YEAR VALIDATION ===
+    const years1 = extractYears(question1);
+    const years2 = extractYears(question2);
+
+    if (years1.size > 0 && years2.size > 0) {
+        const yearIntersection = [...years1].filter(y => years2.has(y));
+        if (yearIntersection.length === 0) {
+            return 0.1; // Different time periods
+        }
+    }
+
+    // === DATE VALIDATION (Month-Day) ===
+    const dates1 = extractMonthDay(question1);
+    const dates2 = extractMonthDay(question2);
+
+    if (dates1.size > 0 && dates2.size > 0) {
+        const dateIntersection = [...dates1].filter(d => dates2.has(d));
+        if (dateIntersection.length === 0) {
+            return 0.3; // Different specific dates
+        }
+    }
+
+    // === TOPIC VALIDATION ===
+    const topics1 = extractKeyTopics(question1);
+    const topics2 = extractKeyTopics(question2);
+
+    if (topics1.size > 0 && topics2.size > 0) {
+        const topicIntersection = [...topics1].filter(t => topics2.has(t));
+        if (topicIntersection.length === 0) {
+            return 0.5; // Different topics - medium penalty
+        }
+    }
+
+    // All validations passed
+    return 1.0;
+}
+
+/**
+ * Find matching markets using semantic similarity (OpenAI embeddings)
+ * Combines semantic similarity with entity/date validation
+ * Falls back to text-based matching if embeddings fail
+ */
+export async function findMatchingMarketsAsync(
+    polymarketMarkets: NormalizedMarket[],
+    kalshiMarkets: NormalizedMarket[],
+    similarityThreshold = 0.40  // Higher default for semantic matching
+): Promise<{
+    matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }>;
+    matchingMethod: 'semantic' | 'text';
+}> {
+    console.log(`[SemanticMatch] Starting with ${polymarketMarkets.length} Polymarket and ${kalshiMarkets.length} Kalshi markets`);
+
+    // Collect all questions for batch embedding
+    const allQuestions = [
+        ...polymarketMarkets.map(m => m.question),
+        ...kalshiMarkets.map(m => m.question),
+    ];
+
+    // Get embeddings for all questions in batch
+    const embeddings = await getEmbeddings(allQuestions);
+
+    // Check if embeddings were generated successfully
+    const embeddingsGenerated = embeddings.some(e => e !== null);
+
+    if (!embeddingsGenerated) {
+        console.log('[SemanticMatch] Embeddings unavailable, falling back to text matching');
+        return {
+            matches: findMatchingMarkets(polymarketMarkets, kalshiMarkets, 0.25),
+            matchingMethod: 'text',
+        };
+    }
+
+    // Create embedding lookup maps
+    const polyEmbeddings = new Map<string, number[]>();
+    const kalshiEmbeddings = new Map<string, number[]>();
+
+    for (let i = 0; i < polymarketMarkets.length; i++) {
+        const emb = embeddings[i];
+        if (emb) {
+            polyEmbeddings.set(polymarketMarkets[i].id, emb);
+        }
+    }
+
+    for (let i = 0; i < kalshiMarkets.length; i++) {
+        const emb = embeddings[polymarketMarkets.length + i];
+        if (emb) {
+            kalshiEmbeddings.set(kalshiMarkets[i].id, emb);
+        }
+    }
+
+    console.log(`[SemanticMatch] Generated ${polyEmbeddings.size} Polymarket and ${kalshiEmbeddings.size} Kalshi embeddings`);
+
+    // Find best matches using semantic similarity + validation
+    const matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> = [];
+    const usedKalshiIds = new Set<string>();
+
+    for (const pm of polymarketMarkets) {
+        const pmEmb = polyEmbeddings.get(pm.id);
+        if (!pmEmb) continue;
+
+        let bestMatch: { kalshi: NormalizedMarket; similarity: number } | null = null;
+
+        for (const km of kalshiMarkets) {
+            if (usedKalshiIds.has(km.id)) continue;
+
+            const kmEmb = kalshiEmbeddings.get(km.id);
+            if (!kmEmb) continue;
+
+            // First check validation score (entity/date/country)
+            const validationScore = calculateValidationScore(pm.question, km.question);
+
+            // Skip if hard rejection
+            if (validationScore === 0) continue;
+
+            // Calculate semantic similarity
+            const semanticSim = cosineSimilarity(pmEmb, kmEmb);
+
+            // Combine scores: semantic * 60% + validation * 40%
+            // But cap at validation score to prevent bad matches
+            const combinedScore = Math.min(
+                (semanticSim * SEMANTIC_WEIGHT) + (validationScore * VALIDATION_WEIGHT),
+                validationScore  // Never score higher than validation allows
+            );
+
+            if (combinedScore >= similarityThreshold) {
+                if (!bestMatch || combinedScore > bestMatch.similarity) {
+                    bestMatch = { kalshi: km, similarity: combinedScore };
+                }
+            }
+        }
+
+        if (bestMatch) {
+            matches.push({
+                polymarket: pm,
+                kalshi: bestMatch.kalshi,
+                similarity: bestMatch.similarity,
+            });
+            usedKalshiIds.add(bestMatch.kalshi.id);
+        }
+    }
+
+    console.log(`[SemanticMatch] Found ${matches.length} semantic matches`);
+
+    // Sort by similarity descending
+    return {
+        matches: matches.sort((a, b) => b.similarity - a.similarity),
+        matchingMethod: 'semantic',
+    };
 }
 
 /**

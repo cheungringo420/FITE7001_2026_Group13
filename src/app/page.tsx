@@ -6,6 +6,31 @@ import { Market, parseMarket, ParsedMarket } from '@/lib/polymarket';
 import { NormalizedMarket } from '@/lib/kalshi/types';
 
 type PlatformFilter = 'all' | 'polymarket' | 'kalshi';
+type CategoryFilter = string; // 'all' or category name
+
+// Define category icons and colors
+const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
+  'Crypto': { icon: '₿', color: 'from-orange-500 to-yellow-500' },
+  'Bitcoin': { icon: '₿', color: 'from-orange-500 to-yellow-500' },
+  'Politics': { icon: '🏛️', color: 'from-blue-500 to-indigo-500' },
+  'US Politics': { icon: '🇺🇸', color: 'from-blue-500 to-red-500' },
+  'Sports': { icon: '⚽', color: 'from-green-500 to-emerald-500' },
+  'NBA': { icon: '🏀', color: 'from-orange-500 to-red-500' },
+  'NFL': { icon: '🏈', color: 'from-green-600 to-yellow-600' },
+  'Soccer': { icon: '⚽', color: 'from-green-500 to-emerald-500' },
+  'Pop Culture': { icon: '🎬', color: 'from-pink-500 to-purple-500' },
+  'Entertainment': { icon: '🎭', color: 'from-pink-500 to-purple-500' },
+  'Science': { icon: '🔬', color: 'from-cyan-500 to-blue-500' },
+  'Tech': { icon: '💻', color: 'from-violet-500 to-purple-500' },
+  'AI': { icon: '🤖', color: 'from-violet-500 to-purple-500' },
+  'Economy': { icon: '📈', color: 'from-emerald-500 to-teal-500' },
+  'Finance': { icon: '💰', color: 'from-emerald-500 to-teal-500' },
+  'World': { icon: '🌍', color: 'from-blue-500 to-cyan-500' },
+  'Weather': { icon: '🌤️', color: 'from-sky-500 to-blue-500' },
+  'Climate': { icon: '🌡️', color: 'from-red-500 to-orange-500' },
+  'Elections': { icon: '🗳️', color: 'from-purple-500 to-pink-500' },
+  'default': { icon: '📊', color: 'from-slate-500 to-slate-600' },
+};
 
 // Combined market type for display
 interface DisplayMarket {
@@ -33,6 +58,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
 
   const fetchData = useCallback(async () => {
     try {
@@ -112,6 +138,12 @@ export default function HomePage() {
       return true;
     })
     .filter(m => {
+      if (categoryFilter === 'all') return true;
+      const marketCategory = m.category?.toLowerCase() || '';
+      const filterCategory = categoryFilter.toLowerCase();
+      return marketCategory.includes(filterCategory) || filterCategory.includes(marketCategory);
+    })
+    .filter(m => {
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
       return (
@@ -120,6 +152,25 @@ export default function HomePage() {
       );
     })
     .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
+
+  // Derive unique categories from all markets
+  const allCategories = Array.from(
+    new Set(
+      allMarkets
+        .map(m => m.category)
+        .filter((c): c is string => !!c && c.trim() !== '')
+    )
+  ).sort();
+
+  // Count markets per category
+  const categoryCounts = allCategories.reduce((acc, cat) => {
+    acc[cat] = allMarkets.filter(m => {
+      const marketCategory = m.category?.toLowerCase() || '';
+      const catLower = cat.toLowerCase();
+      return marketCategory.includes(catLower) || catLower.includes(marketCategory);
+    }).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   const polyCount = polymarketData.length;
   const kalshiCount = kalshiData.length;
@@ -193,76 +244,107 @@ export default function HomePage() {
         {/* Header with Filter */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="text-2xl font-bold text-white">
-            {searchQuery ? `Search Results (${filteredMarkets.length})` : 'Trending Markets'}
+            {searchQuery
+              ? `Search Results (${filteredMarkets.length})`
+              : categoryFilter !== 'all'
+                ? `${categoryFilter} Markets (${filteredMarkets.length})`
+                : 'Trending Markets'}
           </h2>
 
-          {/* Platform Filter Tabs */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-slate-700/50">
+          {/* Unified Filter Bar */}
+          <div className="flex items-center gap-3">
+            {/* Platform Pills */}
+            <div className="flex items-center bg-slate-800/30 rounded-full p-1 border border-slate-700/30">
               <button
                 onClick={() => setPlatformFilter('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${platformFilter === 'all'
-                  ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/30'
-                  : 'text-slate-400 hover:text-white'
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${platformFilter === 'all'
+                  ? 'bg-white/10 text-white'
+                  : 'text-slate-500 hover:text-white'
                   }`}
               >
                 All
-                <span className="ml-1.5 text-xs text-slate-500">({polyCount + kalshiCount})</span>
               </button>
               <button
                 onClick={() => setPlatformFilter('polymarket')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'polymarket'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                  : 'text-slate-400 hover:text-white'
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${platformFilter === 'polymarket'
+                  ? 'bg-purple-500/20 text-purple-300'
+                  : 'text-slate-500 hover:text-white'
                   }`}
               >
-                <span className="w-4 h-4 rounded bg-purple-500/30 text-purple-400 text-[10px] flex items-center justify-center font-bold">P</span>
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                 Polymarket
-                <span className="text-xs text-slate-500">({polyCount})</span>
               </button>
               <button
                 onClick={() => setPlatformFilter('kalshi')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${platformFilter === 'kalshi'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white'
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${platformFilter === 'kalshi'
+                  ? 'bg-blue-500/20 text-blue-300'
+                  : 'text-slate-500 hover:text-white'
                   }`}
               >
-                <span className="w-4 h-4 rounded bg-blue-500/30 text-blue-400 text-[10px] flex items-center justify-center font-bold">K</span>
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                 Kalshi
-                <span className="text-xs text-slate-500">({kalshiCount})</span>
               </button>
             </div>
+
+            {/* Live Indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              Live
+            </div>
           </div>
         </div>
 
-        {/* Live Status */}
-        <div className="flex items-center gap-4 mb-6">
-          {(platformFilter === 'all' || platformFilter === 'polymarket') && (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
-              <span className="text-purple-400">Polymarket</span>
+        {/* Category Filter - Horizontal Scroll */}
+        {allCategories.length > 0 && (
+          <div className="mb-8 -mx-4 px-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${categoryFilter === 'all'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25'
+                    : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50 border border-slate-700/50'
+                  }`}
+              >
+                All Markets
+              </button>
+              {allCategories.slice(0, 10).map((cat) => {
+                const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['default'];
+                const isActive = categoryFilter === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${isActive
+                        ? `bg-gradient-to-r ${config.color} text-white shadow-lg`
+                        : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50 border border-slate-700/50'
+                      }`}
+                  >
+                    <span>{config.icon}</span>
+                    {cat}
+                  </button>
+                );
+              })}
             </div>
-          )}
-          {(platformFilter === 'all' || platformFilter === 'kalshi') && (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-              <span className="text-blue-400">Kalshi</span>
-            </div>
-          )}
-          <span className="text-slate-500 text-sm">• Live data</span>
-        </div>
+          </div>
+        )}
 
-        {/* API Data Source Info */}
-        <div className="mb-6 bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-          <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Info Banner - Collapsible/Minimal */}
+        <div className="mb-6 flex items-center gap-2 text-xs text-slate-500">
+          <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <div className="text-sm">
-            <span className="text-slate-300">Data fetched via official APIs</span>
-            <span className="text-slate-500 ml-1">
-              — External links may be geo-restricted in some regions, but API data is always accessible.
-            </span>
-          </div>
+          <span>Data via official APIs • {polyCount + kalshiCount} markets</span>
+          {categoryFilter !== 'all' && (
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className="text-purple-400 hover:text-purple-300 ml-2"
+            >
+              Clear filter ×
+            </button>
+          )}
         </div>
 
         {error && (

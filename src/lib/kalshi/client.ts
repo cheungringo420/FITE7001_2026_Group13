@@ -377,10 +377,12 @@ export async function fetchAndNormalizeKalshiMarkets(limit = 100): Promise<Norma
             const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
             const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
 
-            const looksLikeQuestion = /^will\s|\\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
+            // Accept markets that look like questions OR have substantial volume
+            const looksLikeQuestion = /^will\s|\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
+            const hasGoodVolume = (m.volume || 0) > 10000; // volume > $100
             const isActive = m.status === 'open' || m.status === 'active';
 
-            return isActive && !isSportsStats && !isParlay && !isPlayerBet && looksLikeQuestion;
+            return isActive && !isSportsStats && !isParlay && !isPlayerBet && (looksLikeQuestion || hasGoodVolume);
         });
 
         let normalizedMarkets = normalizeList(primaryFiltered);

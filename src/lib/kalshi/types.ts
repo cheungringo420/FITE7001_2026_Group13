@@ -110,6 +110,7 @@ export interface ArbitrageOpportunity {
     platform1: {
         name: 'polymarket' | 'kalshi';
         marketId: string;
+        question?: string;
         yesPrice: number;
         noPrice: number;
         url?: string;
@@ -117,6 +118,7 @@ export interface ArbitrageOpportunity {
     platform2: {
         name: 'polymarket' | 'kalshi';
         marketId: string;
+        question?: string;
         yesPrice: number;
         noPrice: number;
         url?: string;
@@ -124,5 +126,6 @@ export interface ArbitrageOpportunity {
     profitPercentage: number;
     totalCost: number; // Cost to buy both positions
     guaranteedProfit: number; // Profit per $1 outcome
+    similarity?: number; // Match similarity score (0-1)
     detectedAt: string;
 }

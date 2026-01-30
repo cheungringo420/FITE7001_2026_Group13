@@ -20,6 +20,7 @@ interface CompareResponse {
     polymarketCount: number;
     kalshiCount: number;
     fetchedAt: string;
+    matchingMethod?: 'semantic' | 'text';  // Indicates which matching algorithm was used
 }
 
 type ViewMode = 'matched' | 'all';
@@ -149,8 +150,8 @@ export default function ComparePage() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className={`text-2xl font-bold ${similarityThreshold >= 0.7 ? 'text-green-400' :
-                                        similarityThreshold >= 0.5 ? 'text-yellow-400' :
-                                            'text-orange-400'
+                                    similarityThreshold >= 0.5 ? 'text-yellow-400' :
+                                        'text-orange-400'
                                     }`}>
                                     {Math.round(similarityThreshold * 100)}%
                                 </span>
@@ -196,8 +197,8 @@ export default function ComparePage() {
                                     key={preset.value}
                                     onClick={() => setSimilarityThreshold(preset.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${Math.abs(similarityThreshold - preset.value) < 0.05
-                                            ? 'bg-purple-500 text-white'
-                                            : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                        ? 'bg-purple-500 text-white'
+                                        : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
                                         }`}
                                 >
                                     {preset.label}
@@ -239,6 +240,27 @@ export default function ComparePage() {
                             <div className="text-lg font-bold text-white">
                                 {new Date(data.fetchedAt).toLocaleTimeString()}
                             </div>
+                            {/* Matching Method Badge */}
+                            <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${data.matchingMethod === 'semantic'
+                                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                    : 'bg-slate-600/20 text-slate-400 border border-slate-500/30'
+                                }`}>
+                                {data.matchingMethod === 'semantic' ? (
+                                    <>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                        </svg>
+                                        AI Semantic
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Text Match
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -263,8 +285,8 @@ export default function ComparePage() {
                         <button
                             onClick={() => setViewMode('matched')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'matched'
-                                    ? 'bg-slate-700 text-white'
-                                    : 'text-slate-400 hover:text-white'
+                                ? 'bg-slate-700 text-white'
+                                : 'text-slate-400 hover:text-white'
                                 }`}
                         >
                             Related Markets
@@ -272,8 +294,8 @@ export default function ComparePage() {
                         <button
                             onClick={() => setViewMode('all')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'all'
-                                    ? 'bg-slate-700 text-white'
-                                    : 'text-slate-400 hover:text-white'
+                                ? 'bg-slate-700 text-white'
+                                : 'text-slate-400 hover:text-white'
                                 }`}
                         >
                             All Markets

@@ -67,9 +67,12 @@ body {
 
 /* Animate pulse for live indicators */
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -93,6 +96,7 @@ body {
   0% {
     background-color: rgba(34, 197, 94, 0.3);
   }
+
   100% {
     background-color: transparent;
   }
@@ -102,6 +106,7 @@ body {
   0% {
     background-color: rgba(239, 68, 68, 0.3);
   }
+
   100% {
     background-color: transparent;
   }
@@ -156,4 +161,14 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
