@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { MarketCompareCard, MarketCompareCardSkeleton, SingleMarketCard } from '@/components/MarketCompareCard';
 import { ExecuteArbitrageModal } from '@/components';
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
+import { useMarketStream } from '@/hooks/useMarketStream';
+import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
+import { TrustSummaryItem, ResolutionAlignmentBreakdown } from '@/lib/trust/types';
 
 interface MatchedMarketPair {
     id: string;
@@ -11,6 +14,8 @@ interface MatchedMarketPair {
     kalshi: NormalizedMarket;
     similarity: number;
     arbitrage: ArbitrageOpportunity | null;
+    alignmentBreakdown: ResolutionAlignmentBreakdown;
+    flagged?: boolean;
 }
 
 interface CompareResponse {
@@ -32,15 +37,27 @@ export default function ComparePage() {
     const [autoRefresh, setAutoRefresh] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('matched');
     const [showOnlyArbitrage, setShowOnlyArbitrage] = useState(false);
+    const [highConfidenceOnly, setHighConfidenceOnly] = useState(false);
     const [selectedArbitrage, setSelectedArbitrage] = useState<ArbitrageOpportunity | null>(null);
     const [similarityThreshold, setSimilarityThreshold] = useState(0.40); // Default 40%, user can adjust
+    const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
+    const [minTrust, setMinTrust] = useState(0);
+    const [strictMode, setStrictMode] = useState(false);
+    const [alignmentThreshold, setAlignmentThreshold] = useState(0.4);
+    const [sortBy, setSortBy] = useState<'similarity' | 'alignment' | 'arbitrage'>('similarity');
+    const [flaggedPairs, setFlaggedPairs] = useState<Record<string, boolean>>({});
+    const [flaggingPairId, setFlaggingPairId] = useState<string | null>(null);
+    const { snapshot, isConnected: streamConnected } = useMarketStream();
 
     const fetchData = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch('/api/markets/compare');
+            const [response, trustItems] = await Promise.all([
+                fetch(strictMode ? '/api/markets/compare?strict=true' : '/api/markets/compare'),
+                fetchTrustSummary({ platform: 'all', limit: 200 }),
+            ]);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch market comparison');
@@ -48,16 +65,50 @@ export default function ComparePage() {
 
             const result = await response.json();
             setData(result);
+
+            if (trustItems.length > 0) {
+                setTrustMap(buildTrustMap(trustItems));
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [strictMode]);
+
+    const handleFlagMismatch = useCallback(async (pair: MatchedMarketPair) => {
+        if (flaggedPairs[pair.id]) return;
+        try {
+            setFlaggingPairId(pair.id);
+            const response = await fetch('/api/feedback/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    polymarketId: pair.polymarket.id,
+                    kalshiId: pair.kalshi.id,
+                    status: 'mismatch',
+                    reason: 'user-flag',
+                }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to flag mismatch');
+            }
+            setFlaggedPairs((prev) => ({ ...prev, [pair.id]: true }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to flag mismatch');
+        } finally {
+            setFlaggingPairId(null);
+        }
+    }, [flaggedPairs]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    useEffect(() => {
+        if (!snapshot?.updatedAt) return;
+        fetchData();
+    }, [snapshot?.updatedAt, fetchData]);
 
     // Auto-refresh every 30 seconds if enabled
     useEffect(() => {
@@ -67,36 +118,89 @@ export default function ComparePage() {
     }, [autoRefresh, fetchData]);
 
     // Filter pairs by user-selected similarity threshold
-    const thresholdFilteredPairs = data?.matchedPairs.filter(p => p.similarity >= similarityThreshold) || [];
-    const arbitrageCount = thresholdFilteredPairs.filter(p => p.arbitrage).length;
-    const filteredPairs = showOnlyArbitrage
-        ? thresholdFilteredPairs.filter(p => p.arbitrage)
+    const visiblePairs = data?.matchedPairs.filter((pair) => !flaggedPairs[pair.id]) || [];
+    const thresholdFilteredPairs = visiblePairs.filter(p => p.similarity >= similarityThreshold);
+    const confidenceFilteredPairs = highConfidenceOnly
+        ? thresholdFilteredPairs.filter(p => p.similarity >= 0.7)
         : thresholdFilteredPairs;
+    const alignmentFilteredPairs = alignmentThreshold > 0
+        ? confidenceFilteredPairs.filter((pair) => (pair.alignmentBreakdown?.score ?? 0) >= alignmentThreshold)
+        : confidenceFilteredPairs;
+    const trustFilteredPairs = minTrust > 0
+        ? alignmentFilteredPairs.filter((pair) => {
+            const polyTrust = trustMap[trustKey('polymarket', pair.polymarket.id)];
+            const kalshiTrust = trustMap[trustKey('kalshi', pair.kalshi.id)];
+            return Boolean(polyTrust && kalshiTrust && polyTrust.trustScore >= minTrust && kalshiTrust.trustScore >= minTrust);
+        })
+        : alignmentFilteredPairs;
+    const arbitrageCount = trustFilteredPairs.filter(p => p.arbitrage).length;
+    const filteredPairs = showOnlyArbitrage
+        ? trustFilteredPairs.filter(p => p.arbitrage)
+        : trustFilteredPairs;
+    const sortedPairs = [...filteredPairs].sort((a, b) => {
+        if (sortBy === 'arbitrage') {
+            const aProfit = a.arbitrage?.profitPercentage ?? -1;
+            const bProfit = b.arbitrage?.profitPercentage ?? -1;
+            return bProfit - aProfit;
+        }
+        if (sortBy === 'alignment') {
+            return (b.alignmentBreakdown?.score ?? 0) - (a.alignmentBreakdown?.score ?? 0);
+        }
+        return b.similarity - a.similarity;
+    });
+    const alignmentAvg = sortedPairs.length
+        ? Math.round(
+            (sortedPairs.reduce((sum, pair) => sum + (pair.alignmentBreakdown?.score ?? 0), 0) / sortedPairs.length) * 100
+        )
+        : 0;
+    const lowAlignmentCount = sortedPairs.filter((pair) => (pair.alignmentBreakdown?.score ?? 0) < 0.5).length;
+    const unmatchedPolymarket = data?.unmatchedPolymarket || [];
+    const unmatchedKalshi = data?.unmatchedKalshi || [];
+    const filteredUnmatchedPolymarket = minTrust > 0
+        ? unmatchedPolymarket.filter((market) => {
+            const trust = trustMap[trustKey('polymarket', market.id)];
+            return trust ? trust.trustScore >= minTrust : false;
+        })
+        : unmatchedPolymarket;
+    const filteredUnmatchedKalshi = minTrust > 0
+        ? unmatchedKalshi.filter((market) => {
+            const trust = trustMap[trustKey('kalshi', market.id)];
+            return trust ? trust.trustScore >= minTrust : false;
+        })
+        : unmatchedKalshi;
 
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen terminal-bg">
             {/* Hero Section */}
             <section className="relative overflow-hidden py-16 px-4">
                 {/* Background gradient */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-slate-950 to-blue-900/20"></div>
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute inset-0 grid-overlay opacity-30"></div>
+                <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-cyan/10 rounded-full blur-3xl"></div>
 
                 <div className="relative max-w-7xl mx-auto">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="flex -space-x-2">
-                            <div className="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-slate-900 flex items-center justify-center">
-                                <span className="text-purple-400 font-bold text-sm">P</span>
+                            <div className="w-10 h-10 rounded-full bg-brand-500/20 border-2 border-slate-900 flex items-center justify-center">
+                                <span className="text-brand-300 font-bold text-sm">P</span>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-blue-500/20 border-2 border-slate-900 flex items-center justify-center">
-                                <span className="text-blue-400 font-bold text-sm">K</span>
+                            <div className="w-10 h-10 rounded-full bg-accent-cyan/20 border-2 border-slate-900 flex items-center justify-center">
+                                <span className="text-accent-cyan font-bold text-sm">K</span>
                             </div>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-bold">
-                            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                        <h1 className="text-4xl md:text-5xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}>
+                            <span className="bg-gradient-to-r from-brand-300 via-accent-cyan to-brand-200 bg-clip-text text-transparent">
                                 Market Comparison
                             </span>
                         </h1>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 mb-6 text-xs text-slate-500">
+                        <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
+                            Stream {streamConnected ? 'Connected' : 'Offline'}
+                        </span>
+                        {snapshot?.updatedAt && (
+                            <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
                     </div>
                     <p className="text-lg text-slate-400 max-w-2xl mb-8">
                         Side-by-side comparison of Polymarket and Kalshi markets.
@@ -108,7 +212,7 @@ export default function ComparePage() {
                         <button
                             onClick={fetchData}
                             disabled={isLoading}
-                            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-6 py-3 bg-gradient-to-r from-brand-500 to-accent-cyan hover:from-brand-600 hover:to-accent-cyan text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-glow-sm"
                         >
                             {isLoading ? (
                                 <>
@@ -133,9 +237,19 @@ export default function ComparePage() {
                                 type="checkbox"
                                 checked={autoRefresh}
                                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
                             />
                             Auto-refresh (30s)
+                        </label>
+
+                        <label className="flex items-center gap-2 text-amber-200 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={strictMode}
+                                onChange={(e) => setStrictMode(e.target.checked)}
+                                className="w-4 h-4 rounded border-amber-400/50 bg-slate-800 text-amber-400 focus:ring-amber-400"
+                            />
+                            Strict matching (resolution aligned)
                         </label>
                     </div>
 
@@ -143,7 +257,7 @@ export default function ComparePage() {
                     <div className="mt-6 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                                 </svg>
                                 <span className="text-white font-medium">Similarity Threshold</span>
@@ -156,7 +270,7 @@ export default function ComparePage() {
                                     {Math.round(similarityThreshold * 100)}%
                                 </span>
                                 <span className="text-slate-500 text-sm">
-                                    ({thresholdFilteredPairs.length} pairs)
+                                    ({trustFilteredPairs.length} pairs)
                                 </span>
                             </div>
                         </div>
@@ -197,7 +311,7 @@ export default function ComparePage() {
                                     key={preset.value}
                                     onClick={() => setSimilarityThreshold(preset.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${Math.abs(similarityThreshold - preset.value) < 0.05
-                                        ? 'bg-purple-500 text-white'
+                                        ? 'bg-brand-500 text-white'
                                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
                                         }`}
                                 >
@@ -205,6 +319,52 @@ export default function ComparePage() {
                                     <span className="ml-1 opacity-70">{preset.desc}</span>
                                 </button>
                             ))}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-white font-medium">Minimum Trust</span>
+                                <span className="text-slate-400 text-sm">{minTrust}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={minTrust}
+                                onChange={(e) => setMinTrust(parseInt(e.target.value, 10))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                style={{
+                                    background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${minTrust}%, rgb(51 65 85) ${minTrust}%, rgb(51 65 85) 100%)`
+                                }}
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-2">
+                                <span>0 (All)</span>
+                                <span>100 (Highest)</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-white font-medium">Resolution Alignment</span>
+                                <span className="text-slate-400 text-sm">{Math.round(alignmentThreshold * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="90"
+                                step="5"
+                                value={Math.round(alignmentThreshold * 100)}
+                                onChange={(e) => setAlignmentThreshold(parseInt(e.target.value, 10) / 100)}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                style={{
+                                    background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${alignmentThreshold * 100}%, rgb(51 65 85) ${alignmentThreshold * 100}%, rgb(51 65 85) 100%)`
+                                }}
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-2">
+                                <span>0% (All)</span>
+                                <span>90% (Strict)</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -214,35 +374,35 @@ export default function ComparePage() {
             {data && (
                 <section className="max-w-7xl mx-auto px-4 py-6">
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                             <div className="text-sm text-slate-400 mb-1">Related Pairs</div>
                             <div className="text-2xl font-bold text-white">
-                                {thresholdFilteredPairs.length}
+                                {trustFilteredPairs.length}
                                 <span className="text-sm text-slate-500 font-normal ml-1">
                                     / {data.matchedPairs.length}
                                 </span>
                             </div>
                         </div>
-                        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-4 border border-green-500/30">
-                            <div className="text-sm text-green-400 mb-1">Arbitrage Found</div>
-                            <div className="text-2xl font-bold text-green-400">{arbitrageCount}</div>
+                        <div className="bg-gradient-to-br from-emerald-500/20 to-brand-500/20 rounded-xl p-4 border border-emerald-500/30 web3-glow">
+                            <div className="text-sm text-emerald-400 mb-1">Arbitrage Found</div>
+                            <div className="text-2xl font-bold text-emerald-400 neon-text-green">{arbitrageCount}</div>
                         </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-purple-500/30">
-                            <div className="text-sm text-purple-400 mb-1">Polymarket</div>
-                            <div className="text-2xl font-bold text-purple-400">{data.polymarketCount}</div>
+                        <div className="bg-brand-500/10 rounded-xl p-4 border border-brand-500/30 web3-glow">
+                            <div className="text-sm text-brand-300 mb-1">Polymarket</div>
+                            <div className="text-2xl font-bold text-brand-300">{data.polymarketCount}</div>
                         </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/30">
-                            <div className="text-sm text-blue-400 mb-1">Kalshi</div>
-                            <div className="text-2xl font-bold text-blue-400">{data.kalshiCount}</div>
+                        <div className="bg-accent-cyan/10 rounded-xl p-4 border border-accent-cyan/30 web3-glow">
+                            <div className="text-sm text-accent-cyan mb-1">Kalshi</div>
+                            <div className="text-2xl font-bold text-accent-cyan">{data.kalshiCount}</div>
                         </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                             <div className="text-sm text-slate-400 mb-1">Last Update</div>
                             <div className="text-lg font-bold text-white">
                                 {new Date(data.fetchedAt).toLocaleTimeString()}
                             </div>
                             {/* Matching Method Badge */}
                             <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${data.matchingMethod === 'semantic'
-                                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                    ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30'
                                     : 'bg-slate-600/20 text-slate-400 border border-slate-500/30'
                                 }`}>
                                 {data.matchingMethod === 'semantic' ? (
@@ -280,8 +440,9 @@ export default function ComparePage() {
 
             {/* View Mode Toggle */}
             <section className="max-w-7xl mx-auto px-4 mb-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1">
+                <div className="sticky top-16 z-20 -mx-4 px-4 py-3 bg-slate-900/85 backdrop-blur border-b border-slate-800/60">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1">
                         <button
                             onClick={() => setViewMode('matched')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'matched'
@@ -300,19 +461,56 @@ export default function ComparePage() {
                         >
                             All Markets
                         </button>
-                    </div>
+                        </div>
 
-                    {viewMode === 'matched' && arbitrageCount > 0 && (
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={showOnlyArbitrage}
-                                onChange={(e) => setShowOnlyArbitrage(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
-                            />
-                            <span className="text-green-400">Show only arbitrage opportunities</span>
-                        </label>
-                    )}
+                        <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={highConfidenceOnly}
+                                    onChange={(e) => setHighConfidenceOnly(e.target.checked)}
+                                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
+                                />
+                                <span className="text-brand-200">High-confidence only (≥ 70%)</span>
+                            </label>
+
+                            {viewMode === 'matched' && arbitrageCount > 0 && (
+                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={showOnlyArbitrage}
+                                        onChange={(e) => setShowOnlyArbitrage(e.target.checked)}
+                                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
+                                    />
+                                    <span className="text-green-400">Show only arbitrage opportunities</span>
+                                </label>
+                            )}
+
+                            {viewMode === 'matched' && (
+                                <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${lowAlignmentCount > 0
+                                        ? 'bg-rose-500/10 text-rose-200 border-rose-500/40'
+                                        : 'bg-emerald-500/10 text-emerald-200 border-emerald-500/40'
+                                    }`}>
+                                    Alignment avg {alignmentAvg}% • Low {lowAlignmentCount}
+                                </div>
+                            )}
+
+                            {viewMode === 'matched' && (
+                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                    <span>Sort by</span>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as 'similarity' | 'alignment' | 'arbitrage')}
+                                        className="bg-slate-800/60 border border-slate-700/60 rounded-lg px-2 py-1 text-slate-200"
+                                    >
+                                        <option value="similarity">Similarity</option>
+                                        <option value="alignment">Alignment</option>
+                                        <option value="arbitrage">Arbitrage</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -335,6 +533,11 @@ export default function ComparePage() {
                                         <strong>Note:</strong> These are <em>related</em> markets on similar topics, not identical markets.
                                         The two platforms have different resolution criteria and timeframes.
                                         True arbitrage requires markets with the <em>exact same</em> resolution conditions.
+                                        {strictMode && (
+                                            <span className="ml-2 text-amber-200">
+                                                Strict mode filters to higher-resolution alignment.
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -348,7 +551,7 @@ export default function ComparePage() {
                             </div>
                         ) : filteredPairs.length > 0 ? (
                             <div className="space-y-6">
-                                {filteredPairs.map((pair) => (
+                                {sortedPairs.map((pair) => (
                                     <MarketCompareCard
                                         key={pair.id}
                                         polymarket={pair.polymarket}
@@ -356,6 +559,15 @@ export default function ComparePage() {
                                         similarity={pair.similarity}
                                         arbitrage={pair.arbitrage}
                                         onExecuteArbitrage={setSelectedArbitrage}
+                                        onFlagMismatch={() => handleFlagMismatch(pair)}
+                                        flagged={Boolean(pair.flagged || flaggedPairs[pair.id])}
+                                        flagging={flaggingPairId === pair.id}
+                                        alignmentBreakdown={pair.alignmentBreakdown}
+                                        matchingMethod={data?.matchingMethod}
+                                        trust={{
+                                            polymarket: trustMap[trustKey('polymarket', pair.polymarket.id)],
+                                            kalshi: trustMap[trustKey('kalshi', pair.kalshi.id)],
+                                        }}
                                     />
                                 ))}
                             </div>
@@ -383,14 +595,14 @@ export default function ComparePage() {
                         {/* Polymarket Column */}
                         <div>
                             <div className="flex items-center gap-3 mb-6">
-                                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                                    <span className="text-purple-400 font-bold">P</span>
+                                <div className="w-8 h-8 rounded-lg bg-brand-500/20 flex items-center justify-center">
+                                    <span className="text-brand-300 font-bold">P</span>
                                 </div>
-                                <h2 className="text-xl font-bold text-purple-400">
+                                <h2 className="text-xl font-bold text-brand-300">
                                     Polymarket Markets
                                 </h2>
                                 <span className="text-slate-500">
-                                    ({data?.unmatchedPolymarket.length || 0} unmatched)
+                                    ({filteredUnmatchedPolymarket.length} unmatched)
                                 </span>
                             </div>
 
@@ -408,11 +620,12 @@ export default function ComparePage() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {data?.unmatchedPolymarket.map((market) => (
+                                    {filteredUnmatchedPolymarket.map((market) => (
                                         <SingleMarketCard
                                             key={market.id}
                                             market={market}
                                             platform="polymarket"
+                                            trust={trustMap[trustKey('polymarket', market.id)]}
                                         />
                                     ))}
                                 </div>
@@ -422,14 +635,14 @@ export default function ComparePage() {
                         {/* Kalshi Column */}
                         <div>
                             <div className="flex items-center gap-3 mb-6">
-                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                                    <span className="text-blue-400 font-bold">K</span>
+                                <div className="w-8 h-8 rounded-lg bg-accent-cyan/20 flex items-center justify-center">
+                                    <span className="text-accent-cyan font-bold">K</span>
                                 </div>
-                                <h2 className="text-xl font-bold text-blue-400">
+                                <h2 className="text-xl font-bold text-accent-cyan">
                                     Kalshi Markets
                                 </h2>
                                 <span className="text-slate-500">
-                                    ({data?.unmatchedKalshi.length || 0} unmatched)
+                                    ({filteredUnmatchedKalshi.length} unmatched)
                                 </span>
                             </div>
 
@@ -447,11 +660,12 @@ export default function ComparePage() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {data?.unmatchedKalshi.map((market) => (
+                                    {filteredUnmatchedKalshi.map((market) => (
                                         <SingleMarketCard
                                             key={market.id}
                                             market={market}
                                             platform="kalshi"
+                                            trust={trustMap[trustKey('kalshi', market.id)]}
                                         />
                                     ))}
                                 </div>
@@ -466,8 +680,8 @@ export default function ComparePage() {
                 <h2 className="text-2xl font-bold text-white mb-6">How Cross-Platform Comparison Works</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-slate-800/30 rounded-2xl p-5 border border-slate-700/50">
-                        <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center mb-3">
-                            <span className="text-purple-400 font-bold">1</span>
+                        <div className="w-10 h-10 bg-brand-500/20 rounded-xl flex items-center justify-center mb-3">
+                            <span className="text-brand-300 font-bold">1</span>
                         </div>
                         <h3 className="font-semibold text-white mb-2">Fetch Markets</h3>
                         <p className="text-slate-400 text-sm">
@@ -475,8 +689,8 @@ export default function ComparePage() {
                         </p>
                     </div>
                     <div className="bg-slate-800/30 rounded-2xl p-5 border border-slate-700/50">
-                        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center mb-3">
-                            <span className="text-blue-400 font-bold">2</span>
+                        <div className="w-10 h-10 bg-accent-cyan/20 rounded-xl flex items-center justify-center mb-3">
+                            <span className="text-accent-cyan font-bold">2</span>
                         </div>
                         <h3 className="font-semibold text-white mb-2">Match Markets</h3>
                         <p className="text-slate-400 text-sm">

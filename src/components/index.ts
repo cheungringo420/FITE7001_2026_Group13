@@ -1,6 +1,9 @@
+export { ErrorBoundary } from './ErrorBoundary';
+export * from './ui';
 export { OrderBook } from './OrderBook';
 export { MarketCard, MarketCardSkeleton } from './MarketCard';
 export { MarketCompareCard, SingleMarketCard, MarketCompareCardSkeleton } from './MarketCompareCard';
+export { TrustBadge } from './TrustBadge';
 export { TradingPanel } from './TradingPanel';
 export { WalletProvider } from './WalletProvider';
 export { WalletButton } from './WalletButton';

@@ -62,6 +62,19 @@ export interface Trade {
     positionId?: string;
 }
 
+export interface TradeTrustSnapshot {
+    evaluatedAt: number;
+    legs: Array<{
+        platform: 'polymarket' | 'kalshi';
+        marketId: string;
+        trustScore: number;
+        resolutionConfidence: number;
+        disputeRisk: number;
+        integrityRisk: number;
+        evidenceCount: number;
+    }>;
+}
+
 // Arbitrage-specific trade pair
 export interface ArbitrageTrade {
     id: string;
@@ -84,6 +97,9 @@ export interface ArbitrageTrade {
 
     // Status
     status: 'executed' | 'partial' | 'failed';
+
+    // Trust snapshot (optional audit metadata)
+    trustSnapshot?: TradeTrustSnapshot;
 }
 
 // Portfolio summary stats

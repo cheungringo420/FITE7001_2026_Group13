@@ -1,15 +1,22 @@
 'use client';
 
 import { ParsedMarket } from '@/lib/polymarket/types';
+import { TrustSummaryItem } from '@/lib/trust/types';
+import { TrustBadge } from './TrustBadge';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface MarketCardProps {
     market: ParsedMarket;
+    trust?: TrustSummaryItem;
 }
 
-export function MarketCard({ market }: MarketCardProps) {
+export function MarketCard({ market, trust }: MarketCardProps) {
     const yesPrice = market.outcomePrices[0] || 0;
     const noPrice = market.outcomePrices[1] || 0;
+    const externalUrl = market.events?.[0]?.slug || market.slug
+        ? `https://polymarket.com/event/${market.events?.[0]?.slug || market.slug}`
+        : undefined;
 
     // Format volume with K/M suffix
     const formatVolume = (volume: string | number) => {
@@ -20,13 +27,13 @@ export function MarketCard({ market }: MarketCardProps) {
     };
 
     return (
-        <Link href={`/market/${market.conditionId}`}>
-            <div className="market-card group relative bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm rounded-2xl p-5 border border-purple-500/30 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 cursor-pointer">
+        <Link href={`/market/${market.conditionId}`} className="block">
+            <div className="market-card group relative web3-card rounded-2xl p-5 hover:shadow-2xl cursor-pointer transform hover:scale-[1.01]">
                 {/* Platform Badge + Live indicator */}
                 <div className="absolute top-4 right-4 flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/20 border border-purple-500/30">
-                        <span className="w-4 h-4 rounded bg-purple-500/30 text-purple-400 text-[10px] flex items-center justify-center font-bold">P</span>
-                        <span className="text-xs text-purple-400 font-medium">Polymarket</span>
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-brand-500/10 border border-brand-500/30">
+                        <span className="w-4 h-4 rounded bg-brand-500/30 text-brand-300 text-[10px] flex items-center justify-center font-bold">P</span>
+                        <span className="text-xs text-brand-300 font-medium">Polymarket</span>
                     </span>
                     {market.active && !market.closed && (
                         <div className="flex items-center gap-1">
@@ -38,19 +45,31 @@ export function MarketCard({ market }: MarketCardProps) {
 
                 {/* Market Image */}
                 {market.image && (
-                    <div className="w-12 h-12 rounded-xl overflow-hidden mb-4 ring-2 ring-purple-500/30 group-hover:ring-purple-500/50 transition-all">
-                        <img
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden mb-4 ring-2 ring-brand-500/30 group-hover:ring-brand-500/50 transition-all">
+                        <Image
                             src={market.image}
                             alt=""
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="48px"
+                            className="object-cover"
                         />
                     </div>
                 )}
 
                 {/* Question */}
-                <h3 className="text-white font-semibold text-lg mb-4 line-clamp-2 group-hover:text-purple-200 transition-colors">
+                <h3 className="text-white font-medium text-lg mb-4 line-clamp-2 group-hover:text-brand-200 transition-colors" style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}>
                     {market.question}
                 </h3>
+
+                {/* Trust Snapshot */}
+                {trust && (
+                    <div className="flex items-center justify-between mb-3 text-xs text-slate-400">
+                        <TrustBadge score={trust.trustScore} />
+                        <span className="text-slate-500">
+                            Dispute {trust.disputeRisk}%
+                        </span>
+                    </div>
+                )}
 
                 {/* Yes/No Prices */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
@@ -83,22 +102,24 @@ export function MarketCard({ market }: MarketCardProps) {
                         )}
                     </div>
                     <div className="flex items-center gap-3">
-                        {(market.events?.[0]?.slug || market.slug) && (
-                            <a
-                                href={`https://polymarket.com/event/${market.events?.[0]?.slug || market.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1"
+                        {externalUrl && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    window.open(externalUrl, '_blank', 'noopener,noreferrer');
+                                }}
+                                className="text-brand-300 hover:text-brand-200 text-xs flex items-center gap-1"
                                 title="Open on Polymarket"
                             >
                                 Polymarket
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
-                            </a>
+                            </button>
                         )}
-                        <span className="text-purple-400">
+                        <span className="text-brand-300">
                             View →
                         </span>
                     </div>
@@ -107,7 +128,7 @@ export function MarketCard({ market }: MarketCardProps) {
                 {/* Category Badge */}
                 {market.category && (
                     <div className="mt-3 pt-3 border-t border-slate-700/50">
-                        <span className="px-2 py-1 rounded-full text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                        <span className="px-2 py-1 rounded-full text-xs bg-brand-500/10 text-brand-300 border border-brand-500/20">
                             {market.category}
                         </span>
                     </div>

@@ -8,11 +8,15 @@ import {
     detectSinglePlatformArbitrage
 } from '@/lib/arbitrage';
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
+import { getMatchFeedbackMap, getMatchKey } from '@/lib/feedback/matchFeedback';
 
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const strict = searchParams.get('strict') === 'true';
+
         // Fetch markets from both platforms in parallel
         const [polymarketRes, normalizedKalshi] = await Promise.all([
             fetch(`${GAMMA_API_BASE}/markets?limit=100&active=true&closed=false&enableOrderBook=true`, {
@@ -41,8 +45,19 @@ export async function GET() {
 
         // Kalshi markets are already normalized by the helper
 
+        const feedbackMap = await getMatchFeedbackMap();
+        const penaltyFn = (polymarketId: string, kalshiId: string) => {
+            const entry = feedbackMap[getMatchKey(polymarketId, kalshiId)];
+            return entry?.status === 'mismatch' ? 0.2 : 1;
+        };
+
         // Find matching markets across platforms
-        const matches = findMatchingMarkets(normalizedPolymarket, normalizedKalshi, 0.35);
+        const matches = findMatchingMarkets(
+            normalizedPolymarket,
+            normalizedKalshi,
+            strict ? 0.55 : 0.35,
+            { strict, penaltyFn }
+        );
 
         // Scan for cross-platform arbitrage
         const crossPlatformArbitrage = scanForArbitrage(matches);

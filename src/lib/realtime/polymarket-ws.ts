@@ -33,6 +33,8 @@ type PriceCallback = (update: PriceUpdate) => void;
 type OrderbookCallback = (update: OrderbookUpdate) => void;
 type TradeCallback = (update: TradeUpdate) => void;
 type StatusCallback = (status: 'connected' | 'disconnected' | 'reconnecting' | 'error') => void;
+type ConnectionCallback = (connected: boolean) => void;
+type EventCallback = (event: import('../polymarket/types').WebSocketEvent) => void;
 
 const POLYMARKET_WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const RECONNECT_DELAY = 3000;
@@ -45,6 +47,8 @@ export class PolymarketWebSocket {
     private orderbookCallbacks: OrderbookCallback[] = [];
     private tradeCallbacks: TradeCallback[] = [];
     private statusCallbacks: StatusCallback[] = [];
+    private connectionCallbacks: ConnectionCallback[] = [];
+    private eventCallbacks: EventCallback[] = [];
     private reconnectTimeout: NodeJS.Timeout | null = null;
     private pingInterval: NodeJS.Timeout | null = null;
     private lastPrices: Map<string, number> = new Map();
@@ -71,9 +75,7 @@ export class PolymarketWebSocket {
                 this.notifyStatus('connected');
 
                 // Subscribe to initial markets
-                this.subscribedMarkets.forEach(market => {
-                    this.sendSubscribe(market);
-                });
+                this.sendSubscribe(Array.from(this.subscribedMarkets));
 
                 // Start ping interval
                 this.startPing();
@@ -122,19 +124,21 @@ export class PolymarketWebSocket {
         console.log('[PolymarketWS] Manually disconnected');
     }
 
-    subscribe(marketId: string): void {
-        this.subscribedMarkets.add(marketId);
+    subscribe(marketIds: string | string[]): void {
+        const ids = Array.isArray(marketIds) ? marketIds : [marketIds];
+        ids.forEach((marketId) => this.subscribedMarkets.add(marketId));
 
         if (this.ws?.readyState === WebSocket.OPEN) {
-            this.sendSubscribe(marketId);
+            this.sendSubscribe(ids);
         }
     }
 
-    unsubscribe(marketId: string): void {
-        this.subscribedMarkets.delete(marketId);
+    unsubscribe(marketIds: string | string[]): void {
+        const ids = Array.isArray(marketIds) ? marketIds : [marketIds];
+        ids.forEach((marketId) => this.subscribedMarkets.delete(marketId));
 
         if (this.ws?.readyState === WebSocket.OPEN) {
-            this.sendUnsubscribe(marketId);
+            this.sendUnsubscribe(ids);
         }
     }
 
@@ -166,6 +170,20 @@ export class PolymarketWebSocket {
         };
     }
 
+    onConnectionChange(callback: ConnectionCallback): () => void {
+        this.connectionCallbacks.push(callback);
+        return () => {
+            this.connectionCallbacks = this.connectionCallbacks.filter(cb => cb !== callback);
+        };
+    }
+
+    onEvent(callback: EventCallback): () => void {
+        this.eventCallbacks.push(callback);
+        return () => {
+            this.eventCallbacks = this.eventCallbacks.filter(cb => cb !== callback);
+        };
+    }
+
     getSubscribedMarkets(): string[] {
         return Array.from(this.subscribedMarkets);
     }
@@ -174,19 +192,21 @@ export class PolymarketWebSocket {
         return this.ws?.readyState === WebSocket.OPEN;
     }
 
-    private sendSubscribe(marketId: string): void {
+    private sendSubscribe(marketIds: string[]): void {
+        if (marketIds.length === 0) return;
         this.send({
             type: 'subscribe',
             channel: 'market',
-            markets: [marketId],
+            markets: marketIds,
         });
     }
 
-    private sendUnsubscribe(marketId: string): void {
+    private sendUnsubscribe(marketIds: string[]): void {
+        if (marketIds.length === 0) return;
         this.send({
             type: 'unsubscribe',
             channel: 'market',
-            markets: [marketId],
+            markets: marketIds,
         });
     }
 
@@ -201,6 +221,11 @@ export class PolymarketWebSocket {
             const message = JSON.parse(data);
 
             // Handle different message types
+            if (Array.isArray(message)) {
+                message.forEach((event) => this.handleEventMessage(event));
+                return;
+            }
+
             switch (message.type) {
                 case 'price_change':
                     this.handlePriceChange(message);
@@ -228,10 +253,31 @@ export class PolymarketWebSocket {
     }
 
     private handleEventMessage(message: { event_type: string;[key: string]: unknown }): void {
+        // Emit raw event for legacy consumers
+        this.eventCallbacks.forEach(cb => cb(message as import('../polymarket/types').WebSocketEvent));
+
+        const marketId = (message.asset_id as string) || (message.market as string);
+
+        if (message.event_type === 'book') {
+            const bids = (message.bids as Array<{ price: string | number; size: string | number }> || [])
+                .map(level => ({ price: Number(level.price), size: Number(level.size) }));
+            const asks = (message.asks as Array<{ price: string | number; size: string | number }> || [])
+                .map(level => ({ price: Number(level.price), size: Number(level.size) }));
+
+            if (marketId) {
+                const update: OrderbookUpdate = {
+                    marketId,
+                    bids,
+                    asks,
+                    timestamp: Date.now(),
+                };
+                this.orderbookCallbacks.forEach(cb => cb(update));
+            }
+        }
+
         // Handle Polymarket's event-based message format
-        if (message.event_type === 'price_change' || message.event_type === 'tick_size_change') {
-            const marketId = message.asset_id as string || message.market as string;
-            const price = message.price as number;
+        if (message.event_type === 'price_change' || message.event_type === 'tick_size_change' || message.event_type === 'last_trade_price') {
+            const price = Number(message.price);
 
             if (marketId && price !== undefined) {
                 const lastPrice = this.lastPrices.get(marketId);
@@ -319,6 +365,10 @@ export class PolymarketWebSocket {
 
     private notifyStatus(status: 'connected' | 'disconnected' | 'reconnecting' | 'error'): void {
         this.statusCallbacks.forEach(cb => cb(status));
+        const isConnected = status === 'connected';
+        if (status === 'connected' || status === 'disconnected') {
+            this.connectionCallbacks.forEach(cb => cb(isConnected));
+        }
     }
 
     private scheduleReconnect(): void {

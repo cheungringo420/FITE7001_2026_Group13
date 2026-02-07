@@ -2,7 +2,8 @@
 
 import { NormalizedMarket, ArbitrageOpportunity } from '../kalshi/types';
 import { ParsedMarket } from '../polymarket/types';
-import { getEmbeddings, cosineSimilarity, prewarmCache } from '../ai/embeddings';
+import { getEmbeddings, cosineSimilarity } from '../ai/embeddings';
+import { extractResolutionCriteria } from '../trust/criteria';
 
 /**
  * Normalize a Polymarket market to cross-platform format
@@ -41,6 +42,11 @@ const DATE_WEIGHT = 0.20;
 const TOPIC_WEIGHT = 0.10;
 const EXACT_PHRASE_WEIGHT = 0.10;
 
+export interface MatchOptions {
+    strict?: boolean;
+    penaltyFn?: (polymarketId: string, kalshiId: string) => number;
+}
+
 // Key people/entities that MUST match if present in both questions
 const CRITICAL_ENTITIES = [
     // Politicians
@@ -71,8 +77,11 @@ const KEY_TOPICS = [
     'mars', 'nasa', 'moon', 'starship',
     'deportation', 'immigration', 'border',
     'tariff', 'trade war',
-    'trillionaire', 'billionaire',
-    'doge', 'budget', 'deficit',
+    'trillionaire', 'billionaire', 'net worth', 'wealth',
+    'revenue', 'tax', 'budget', 'deficit', 'spending',
+    'ipo', 'bankruptcy', 'earnings', 'profit', 'loss',
+    'stock', 'share price', 'market cap', 'valuation',
+    'doge',
 ];
 
 const COUNTRIES = [
@@ -160,6 +169,56 @@ function extractCountries(text: string): Set<string> {
     return found;
 }
 
+function extractProperNames(text: string): Set<string> {
+    const entities = new Set<string>();
+    const properNounMatches = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g);
+    if (!properNounMatches) return entities;
+
+    const stopPhrases = [
+        'United States', 'United Kingdom', 'European Union', 'White House',
+        'Supreme Court', 'Federal Reserve', 'New York', 'Los Angeles',
+    ];
+
+    properNounMatches.forEach((match) => {
+        if (stopPhrases.some((phrase) => match.startsWith(phrase))) return;
+        entities.add(match.toLowerCase());
+    });
+
+    return entities;
+}
+
+function extractNumericTokens(text: string): Set<string> {
+    const tokens = new Set<string>();
+    const matches = text.match(/\$?\d+(?:\.\d+)?\s*(bps|%|billion|trillion|million|bn|m|b|k|usd|dollars)?/gi);
+    if (!matches) return tokens;
+
+    matches.forEach((match) => {
+        const normalized = match.toLowerCase().replace(/\s+/g, '');
+        if (/^20\d{2}$/.test(normalized)) return;
+        tokens.add(normalized);
+    });
+
+    return tokens;
+}
+
+function normalizeCategoryTokens(category?: string): string[] {
+    if (!category) return [];
+    const normalized = category.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+    return normalized
+        .split(/\s+/)
+        .filter((token) => token && token !== 'general' && token !== 'markets' && token !== 'market');
+}
+
+function categorySimilarity(cat1?: string, cat2?: string): number {
+    const tokens1 = new Set(normalizeCategoryTokens(cat1));
+    const tokens2 = new Set(normalizeCategoryTokens(cat2));
+
+    if (tokens1.size === 0 || tokens2.size === 0) return 0.5;
+    const intersection = [...tokens1].filter((token) => tokens2.has(token));
+    const union = new Set([...tokens1, ...tokens2]);
+    return union.size === 0 ? 0.5 : intersection.length / union.size;
+}
+
 function extractOfficeTargets(text: string): Set<string> {
     const lower = text.toLowerCase();
     const targets = new Set<string>();
@@ -240,6 +299,33 @@ function normalizeText(text: string): string {
         .replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function clampScore(value: number, min = 0, max = 1): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+export function calculateResolutionAlignment(question1: string, question2: string): number {
+    const criteria1 = extractResolutionCriteria(question1);
+    const criteria2 = extractResolutionCriteria(question2);
+
+    let score = 1.0;
+
+    if (criteria1.hasExplicitDate !== criteria2.hasExplicitDate) score -= 0.2;
+    if (criteria1.hasObjectiveThreshold !== criteria2.hasObjectiveThreshold) score -= 0.2;
+    if (criteria1.hasResolutionWording !== criteria2.hasResolutionWording) score -= 0.1;
+
+    if (criteria1.timeWindow?.raw && criteria2.timeWindow?.raw && criteria1.timeWindow.raw !== criteria2.timeWindow.raw) {
+        score -= 0.3;
+    }
+
+    if (criteria1.ambiguityFlags.length !== criteria2.ambiguityFlags.length) {
+        score -= 0.1;
+    } else if (criteria1.ambiguityFlags.length > 0 && criteria2.ambiguityFlags.length > 0) {
+        score -= 0.05;
+    }
+
+    return clampScore(score);
 }
 
 /**
@@ -405,8 +491,10 @@ export function calculateSimilarity(question1: string, question2: string): numbe
 export function findMatchingMarkets(
     polymarketMarkets: NormalizedMarket[],
     kalshiMarkets: NormalizedMarket[],
-    similarityThreshold = 0.25
+    similarityThreshold = 0.25,
+    options?: MatchOptions
 ): Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> {
+    const strict = options?.strict ?? false;
     const matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }> = [];
     const usedKalshiIds = new Set<string>();
 
@@ -418,11 +506,22 @@ export function findMatchingMarkets(
             // Skip if this Kalshi market is already matched
             if (usedKalshiIds.has(km.id)) continue;
 
-            const similarity = calculateSimilarity(pm.question, km.question);
+            const categoryScore = categorySimilarity(pm.category, km.category);
+            if (categoryScore < 0.2) continue;
 
-            if (similarity >= similarityThreshold) {
-                if (!bestMatch || similarity > bestMatch.similarity) {
-                    bestMatch = { kalshi: km, similarity };
+            const alignmentScore = calculateResolutionAlignment(pm.question, km.question);
+            if (alignmentScore < (strict ? 0.6 : 0.3)) continue;
+
+            const similarity = calculateSimilarity(pm.question, km.question)
+                * (0.7 + 0.3 * categoryScore)
+                * (0.7 + 0.3 * alignmentScore);
+
+            const penalty = options?.penaltyFn ? clampScore(options.penaltyFn(pm.id, km.id), 0, 1) : 1;
+            const adjustedSimilarity = similarity * penalty;
+
+            if (adjustedSimilarity >= similarityThreshold) {
+                if (!bestMatch || adjustedSimilarity > bestMatch.similarity) {
+                    bestMatch = { kalshi: km, similarity: adjustedSimilarity };
                 }
             }
         }
@@ -454,6 +553,7 @@ const VALIDATION_WEIGHT = 0.40; // 40% weight on entity/date validation
  * Returns 0 if hard rejection (different entities/dates), otherwise 0-1
  */
 function calculateValidationScore(question1: string, question2: string): number {
+    let score = 1.0;
     // === CRITICAL ENTITY CHECK ===
     const critical1 = extractCriticalEntities(question1);
     const critical2 = extractCriticalEntities(question2);
@@ -464,6 +564,8 @@ function calculateValidationScore(question1: string, question2: string): number 
         if (criticalIntersection.length === 0) {
             return 0; // HARD REJECTION - different subjects
         }
+    } else if ((critical1.size > 0 && critical2.size === 0) || (critical2.size > 0 && critical1.size === 0)) {
+        score = Math.min(score, 0.35);
     }
 
     // === COUNTRY VALIDATION ===
@@ -472,7 +574,7 @@ function calculateValidationScore(question1: string, question2: string): number 
     if (countries1.size > 0 && countries2.size > 0) {
         const countryIntersection = [...countries1].filter(c => countries2.has(c));
         if (countryIntersection.length === 0) {
-            return 0.1; // Different countries - low validation
+            score = Math.min(score, 0.1);
         }
     }
 
@@ -483,7 +585,7 @@ function calculateValidationScore(question1: string, question2: string): number 
     if (years1.size > 0 && years2.size > 0) {
         const yearIntersection = [...years1].filter(y => years2.has(y));
         if (yearIntersection.length === 0) {
-            return 0.1; // Different time periods
+            score = Math.min(score, 0.1);
         }
     }
 
@@ -494,7 +596,7 @@ function calculateValidationScore(question1: string, question2: string): number 
     if (dates1.size > 0 && dates2.size > 0) {
         const dateIntersection = [...dates1].filter(d => dates2.has(d));
         if (dateIntersection.length === 0) {
-            return 0.3; // Different specific dates
+            score = Math.min(score, 0.2);
         }
     }
 
@@ -505,12 +607,38 @@ function calculateValidationScore(question1: string, question2: string): number 
     if (topics1.size > 0 && topics2.size > 0) {
         const topicIntersection = [...topics1].filter(t => topics2.has(t));
         if (topicIntersection.length === 0) {
-            return 0.5; // Different topics - medium penalty
+            score = Math.min(score, 0.25);
         }
     }
 
-    // All validations passed
-    return 1.0;
+    // === PROPER NAME CHECK ===
+    const proper1 = extractProperNames(question1);
+    const proper2 = extractProperNames(question2);
+    if (proper1.size > 0 && proper2.size > 0) {
+        const properIntersection = [...proper1].filter(p => proper2.has(p));
+        if (properIntersection.length === 0) {
+            score = Math.min(score, 0.25);
+        }
+    } else if ((proper1.size > 0 && proper2.size === 0) || (proper2.size > 0 && proper1.size === 0)) {
+        score = Math.min(score, 0.35);
+    }
+
+    // === NUMERIC TOKEN CHECK ===
+    const nums1 = extractNumericTokens(question1);
+    const nums2 = extractNumericTokens(question2);
+    if (nums1.size > 0 && nums2.size > 0) {
+        const numericIntersection = [...nums1].filter(n => nums2.has(n));
+        if (numericIntersection.length === 0) {
+            score = Math.min(score, 0.25);
+        }
+    } else if ((nums1.size > 0 && nums2.size === 0) || (nums2.size > 0 && nums1.size === 0)) {
+        score = Math.min(score, 0.35);
+    }
+
+    const resolutionAlignment = calculateResolutionAlignment(question1, question2);
+    score = Math.min(score, resolutionAlignment);
+
+    return score;
 }
 
 /**
@@ -521,11 +649,13 @@ function calculateValidationScore(question1: string, question2: string): number 
 export async function findMatchingMarketsAsync(
     polymarketMarkets: NormalizedMarket[],
     kalshiMarkets: NormalizedMarket[],
-    similarityThreshold = 0.40  // Higher default for semantic matching
+    similarityThreshold = 0.40,  // Higher default for semantic matching
+    options?: MatchOptions
 ): Promise<{
     matches: Array<{ polymarket: NormalizedMarket; kalshi: NormalizedMarket; similarity: number }>;
     matchingMethod: 'semantic' | 'text';
 }> {
+    const strict = options?.strict ?? false;
     console.log(`[SemanticMatch] Starting with ${polymarketMarkets.length} Polymarket and ${kalshiMarkets.length} Kalshi markets`);
 
     // Collect all questions for batch embedding
@@ -543,7 +673,7 @@ export async function findMatchingMarketsAsync(
     if (!embeddingsGenerated) {
         console.log('[SemanticMatch] Embeddings unavailable, falling back to text matching');
         return {
-            matches: findMatchingMarkets(polymarketMarkets, kalshiMarkets, 0.25),
+            matches: findMatchingMarkets(polymarketMarkets, kalshiMarkets, 0.25, options),
             matchingMethod: 'text',
         };
     }
@@ -581,11 +711,16 @@ export async function findMatchingMarketsAsync(
         for (const km of kalshiMarkets) {
             if (usedKalshiIds.has(km.id)) continue;
 
+            const categoryScore = categorySimilarity(pm.category, km.category);
+            if (categoryScore < 0.2) continue;
+
             const kmEmb = kalshiEmbeddings.get(km.id);
             if (!kmEmb) continue;
 
             // First check validation score (entity/date/country)
             const validationScore = calculateValidationScore(pm.question, km.question);
+            const alignmentScore = calculateResolutionAlignment(pm.question, km.question);
+            if (alignmentScore < (strict ? 0.6 : 0.3)) continue;
 
             // Skip if hard rejection
             if (validationScore === 0) continue;
@@ -595,14 +730,20 @@ export async function findMatchingMarketsAsync(
 
             // Combine scores: semantic * 60% + validation * 40%
             // But cap at validation score to prevent bad matches
-            const combinedScore = Math.min(
+            const baseScore = Math.min(
                 (semanticSim * SEMANTIC_WEIGHT) + (validationScore * VALIDATION_WEIGHT),
-                validationScore  // Never score higher than validation allows
+                validationScore
             );
+            const combinedScore = baseScore
+                * (0.7 + 0.3 * categoryScore)
+                * (0.7 + 0.3 * alignmentScore);
 
-            if (combinedScore >= similarityThreshold) {
-                if (!bestMatch || combinedScore > bestMatch.similarity) {
-                    bestMatch = { kalshi: km, similarity: combinedScore };
+            const penalty = options?.penaltyFn ? clampScore(options.penaltyFn(pm.id, km.id), 0, 1) : 1;
+            const adjustedScore = combinedScore * penalty;
+
+            if (adjustedScore >= similarityThreshold) {
+                if (!bestMatch || adjustedScore > bestMatch.similarity) {
+                    bestMatch = { kalshi: km, similarity: adjustedScore };
                 }
             }
         }

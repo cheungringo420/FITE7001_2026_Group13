@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { PriceChart, Sparkline } from '@/components/charts';
+import { TrustBadge } from '@/components';
 import { Position, Trade } from '@/lib/portfolio/types';
+import { useMarketStream } from '@/hooks/useMarketStream';
 
 // Stats card component
 function StatCard({
@@ -23,8 +24,8 @@ function StatCard({
         default: 'bg-slate-800/50',
         green: 'bg-green-500/10 border-green-500/20',
         red: 'bg-red-500/10 border-red-500/20',
-        purple: 'bg-purple-500/10 border-purple-500/20',
-        blue: 'bg-blue-500/10 border-blue-500/20',
+        purple: 'bg-brand-500/10 border-brand-500/20',
+        blue: 'bg-accent-cyan/10 border-accent-cyan/20',
     };
 
     const trendColors = {
@@ -56,7 +57,7 @@ function PositionRow({ position, onClose }: { position: Position; onClose: (id: 
         <tr className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
             <td className="py-3 px-4">
                 <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${position.platform === 'polymarket' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${position.platform === 'polymarket' ? 'bg-brand-500' : 'bg-accent-cyan'}`} />
                     <span className="text-xs text-slate-500 uppercase">{position.platform}</span>
                 </div>
             </td>
@@ -114,7 +115,7 @@ function TradeRow({ trade }: { trade: Trade }) {
             </td>
             <td className="py-3 px-4">
                 <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${trade.platform === 'polymarket' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${trade.platform === 'polymarket' ? 'bg-brand-500' : 'bg-accent-cyan'}`} />
                     <span className="text-white font-medium line-clamp-1">{trade.marketTitle}</span>
                 </div>
             </td>
@@ -169,6 +170,7 @@ export default function PortfolioPage() {
 
     const [activeTab, setActiveTab] = useState<'positions' | 'trades' | 'arbitrage'>('positions');
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const { snapshot, isConnected: streamConnected } = useMarketStream();
 
     const handleClosePosition = (id: string) => {
         // For demo, close at current price (in real app, this would execute a trade)
@@ -182,7 +184,7 @@ export default function PortfolioPage() {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-slate-400">Loading portfolio...</p>
                 </div>
             </div>
@@ -190,13 +192,22 @@ export default function PortfolioPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 py-8">
+        <div className="min-h-screen terminal-bg py-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Portfolio</h1>
+                        <h1 className="text-3xl font-bold text-white text-gradient-brand">Portfolio</h1>
                         <p className="text-slate-400 mt-1">Track your positions and trading performance</p>
+                    </div>
+
+                    <div className="hidden md:flex items-center gap-2 text-xs text-slate-500">
+                        <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
+                            Stream {streamConnected ? 'Connected' : 'Offline'}
+                        </span>
+                        {snapshot?.updatedAt && (
+                            <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
                     </div>
 
                     {positions.length > 0 && (
@@ -268,18 +279,18 @@ export default function PortfolioPage() {
                 {/* Platform breakdown */}
                 {stats.openPositions > 0 && (
                     <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+                        <div className="rounded-xl border border-brand-500/20 bg-brand-500/5 p-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="w-3 h-3 rounded-full bg-purple-500" />
-                                <span className="text-purple-400 font-medium">Polymarket</span>
+                                <span className="w-3 h-3 rounded-full bg-brand-500" />
+                                <span className="text-brand-300 font-medium">Polymarket</span>
                             </div>
                             <p className="text-2xl font-bold text-white">${stats.polymarketValue.toFixed(2)}</p>
                             <p className="text-sm text-slate-400">{stats.polymarketPositions} positions</p>
                         </div>
-                        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                        <div className="rounded-xl border border-accent-cyan/20 bg-accent-cyan/5 p-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="w-3 h-3 rounded-full bg-blue-500" />
-                                <span className="text-blue-400 font-medium">Kalshi</span>
+                                <span className="w-3 h-3 rounded-full bg-accent-cyan" />
+                                <span className="text-accent-cyan font-medium">Kalshi</span>
                             </div>
                             <p className="text-2xl font-bold text-white">${stats.kalshiValue.toFixed(2)}</p>
                             <p className="text-sm text-slate-400">{stats.kalshiPositions} positions</p>
@@ -288,13 +299,13 @@ export default function PortfolioPage() {
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
+                <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit glass">
                     {(['positions', 'trades', 'arbitrage'] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === tab
-                                    ? 'bg-purple-500 text-white'
+                                    ? 'bg-gradient-to-r from-brand-500 to-accent-cyan text-white shadow-glow-sm'
                                     : 'text-slate-400 hover:text-white'
                                 }`}
                         >
@@ -389,6 +400,18 @@ export default function PortfolioPage() {
                                                 <p className="text-xs text-slate-500">
                                                     {new Date(arb.timestamp).toLocaleString()} • {Math.round(arb.similarity * 100)}% match
                                                 </p>
+                                                {arb.trustSnapshot?.legs?.length ? (
+                                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                                        {arb.trustSnapshot.legs.map((leg) => (
+                                                            <div key={`${arb.id}-${leg.platform}`} className="flex items-center gap-1">
+                                                                <span className={leg.platform === 'polymarket' ? 'text-brand-300' : 'text-accent-cyan'}>
+                                                                    {leg.platform === 'polymarket' ? 'Poly' : 'Kalshi'}
+                                                                </span>
+                                                                <TrustBadge score={leg.trustScore} compact />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                             <div className="text-right">
                                                 <p className={`font-bold ${arb.actualProfit !== undefined ? (arb.actualProfit >= 0 ? 'text-green-400' : 'text-red-400') : 'text-yellow-400'}`}>
@@ -404,12 +427,12 @@ export default function PortfolioPage() {
                                         </div>
                                         <div className="grid grid-cols-2 gap-4 text-sm">
                                             <div className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-purple-500" />
+                                                <span className="w-2 h-2 rounded-full bg-brand-500" />
                                                 <span className="text-slate-400">Polymarket:</span>
                                                 <span className="text-white">${arb.polymarketTrade.total.toFixed(2)}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                                <span className="w-2 h-2 rounded-full bg-accent-cyan" />
                                                 <span className="text-slate-400">Kalshi:</span>
                                                 <span className="text-white">${arb.kalshiTrade.total.toFixed(2)}</span>
                                             </div>

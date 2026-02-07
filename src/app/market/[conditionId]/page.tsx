@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, use } from 'react';
-import { OrderBook, TradingPanel } from '@/components';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
+import { OrderBook, TradingPanel, TrustBadge } from '@/components';
 import {
     Market,
     OrderBook as OrderBookType,
@@ -11,14 +14,13 @@ import {
     WebSocketEvent,
     BookEvent
 } from '@/lib/polymarket';
+import { TrustAnalysis } from '@/lib/trust/types';
 
-interface Props {
-    params: Promise<{ conditionId: string }>;
-}
-
-export default function MarketPage({ params }: Props) {
-    const resolvedParams = use(params);
-    const { conditionId } = resolvedParams;
+export default function MarketPage() {
+    const params = useParams();
+    const conditionId = Array.isArray(params?.conditionId)
+        ? params.conditionId[0]
+        : params?.conditionId;
 
     const [market, setMarket] = useState<ParsedMarket | null>(null);
     const [orderBooks, setOrderBooks] = useState<{ [tokenId: string]: OrderBookType }>({});
@@ -26,9 +28,12 @@ export default function MarketPage({ params }: Props) {
     const [isLoading, setIsLoading] = useState(true);
     const [isWsConnected, setIsWsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [trustAnalysis, setTrustAnalysis] = useState<TrustAnalysis | null>(null);
 
     // Fetch market data
     useEffect(() => {
+        if (!conditionId) return;
+
         const fetchMarket = async () => {
             try {
                 setIsLoading(true);
@@ -74,6 +79,31 @@ export default function MarketPage({ params }: Props) {
         };
 
         fetchMarket();
+    }, [conditionId]);
+
+    useEffect(() => {
+        if (!conditionId) return;
+        let active = true;
+
+        const fetchTrust = async () => {
+            try {
+                const response = await fetch(`/api/trust/market?platform=polymarket&id=${conditionId}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (active) {
+                    setTrustAnalysis(data.analysis || null);
+                }
+            } catch {
+                if (active) {
+                    setTrustAnalysis(null);
+                }
+            }
+        };
+
+        fetchTrust();
+        return () => {
+            active = false;
+        };
     }, [conditionId]);
 
     // WebSocket connection for real-time updates
@@ -138,12 +168,12 @@ export default function MarketPage({ params }: Props) {
                     <p className="text-slate-400 mb-4">
                         The market you&apos;re looking for doesn&apos;t exist or has been removed.
                     </p>
-                    <a
+                    <Link
                         href="/"
                         className="inline-block px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-lg text-white transition-colors"
                     >
                         ← Back to Markets
-                    </a>
+                    </Link>
                 </div>
             </div>
         );
@@ -157,7 +187,7 @@ export default function MarketPage({ params }: Props) {
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
             {/* Back button */}
-            <a
+            <Link
                 href="/"
                 className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6"
             >
@@ -165,16 +195,18 @@ export default function MarketPage({ params }: Props) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
                 Back to Markets
-            </a>
+            </Link>
 
             {/* Market Header */}
             <div className="mb-8">
                 <div className="flex items-start gap-4 mb-4">
                     {market.image && (
-                        <img
+                        <Image
                             src={market.image}
                             alt=""
-                            className="w-16 h-16 rounded-xl ring-2 ring-slate-700"
+                            width={64}
+                            height={64}
+                            className="w-16 h-16 rounded-xl ring-2 ring-slate-700 object-cover"
                         />
                     )}
                     <div className="flex-1">
@@ -209,6 +241,64 @@ export default function MarketPage({ params }: Props) {
                     </p>
                 )}
             </div>
+
+            {trustAnalysis && (
+                <div className="mb-8 bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-white">Trust & Resolution</h2>
+                            <p className="text-sm text-slate-400">Evidence-backed confidence snapshot</p>
+                        </div>
+                        <TrustBadge score={trustAnalysis.trustScore} />
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                        <div>
+                            <div className="text-slate-400">Resolution</div>
+                            <div className="text-white font-semibold">{trustAnalysis.resolutionConfidence}%</div>
+                        </div>
+                        <div>
+                            <div className="text-slate-400">Dispute Risk</div>
+                            <div className="text-white font-semibold">{trustAnalysis.disputeRisk}%</div>
+                        </div>
+                        <div>
+                            <div className="text-slate-400">Integrity Risk</div>
+                            <div className="text-white font-semibold">{trustAnalysis.integrityRisk}%</div>
+                        </div>
+                        <div>
+                            <div className="text-slate-400">Evidence</div>
+                            <div className="text-white font-semibold">{trustAnalysis.evidenceCount}</div>
+                        </div>
+                        <div>
+                            <div className="text-slate-400">Clarity</div>
+                            <div className="text-white font-semibold">
+                                {(trustAnalysis.criteria.clarityScore * 100).toFixed(0)}%
+                            </div>
+                        </div>
+                    </div>
+
+                    {trustAnalysis.evidence.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                            <div className="text-xs text-slate-500 mb-2">Top evidence</div>
+                            <div className="space-y-2">
+                                {trustAnalysis.evidence.slice(0, 3).map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between text-sm">
+                                        <div className="text-slate-300 line-clamp-1">{item.title}</div>
+                                        <span className={`text-xs font-medium ${item.stance === 'support'
+                                                ? 'text-green-400'
+                                                : item.stance === 'contradict'
+                                                    ? 'text-red-400'
+                                                    : 'text-slate-400'
+                                            }`}>
+                                            {item.stance.toUpperCase()}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -279,6 +369,13 @@ export default function MarketPage({ params }: Props) {
                         marketQuestion={market.question}
                         outcomes={market.outcomes}
                         disabled={true}
+                        trust={trustAnalysis ? {
+                            trustScore: trustAnalysis.trustScore,
+                            resolutionConfidence: trustAnalysis.resolutionConfidence,
+                            disputeRisk: trustAnalysis.disputeRisk,
+                            integrityRisk: trustAnalysis.integrityRisk,
+                            evidenceCount: trustAnalysis.evidenceCount,
+                        } : undefined}
                     />
                 </div>
             </div>

@@ -11,12 +11,11 @@ import {
     BotOpportunity,
     BotTrade,
     BotEvent,
-    BotStatus,
     INITIAL_BOT_STATE,
     STRATEGY_PRESETS,
 } from './types';
-import { ArbitrageOpportunity, NormalizedMarket } from '../kalshi/types';
-import { executeArbitrage, ExecutionCredentials, ExecutionResult } from '../arbitrage/execution';
+import { ArbitrageOpportunity } from '../kalshi/types';
+import { executeArbitrage, ExecutionCredentials } from '../arbitrage/execution';
 
 type EventCallback = (event: BotEvent) => void;
 type StateCallback = (state: BotState) => void;
@@ -32,6 +31,7 @@ export class ArbitrageBot {
     private scanInterval: NodeJS.Timeout | null = null;
     private cooldownMarkets: Map<string, number> = new Map(); // marketId -> cooldown end time
     private pendingConfirmations: Map<string, BotOpportunity> = new Map();
+    private isScanning = false;
 
     private apiBaseUrl: string;
 
@@ -181,156 +181,166 @@ export class ArbitrageBot {
 
         // Set up interval (every 5 seconds)
         this.scanInterval = setInterval(() => {
-            if (this.state.status === 'running') {
+            if (this.state.status === 'running' && !this.isScanning) {
                 this.scan();
             }
         }, 5000);
     }
 
     private async scan(): Promise<void> {
-        if (this.state.status !== 'running') return;
-
-        // Check daily limits
-        if (this.state.tradesCount >= this.config.maxDailyTrades) {
-            this.updateState({
-                status: 'paused',
-                statusMessage: 'Daily trade limit reached',
-            });
-            this.emitEvent({
-                type: 'daily_limit_reached',
-                timestamp: new Date().toISOString(),
-                message: `Daily trade limit of ${this.config.maxDailyTrades} reached`,
-            });
+        // Prevent overlapping scans
+        if (this.isScanning) {
             return;
         }
-
-        if (this.state.lossToday >= this.config.maxDailyLoss) {
-            this.updateState({
-                status: 'paused',
-                statusMessage: 'Daily loss limit reached',
-            });
-            this.emitEvent({
-                type: 'daily_limit_reached',
-                timestamp: new Date().toISOString(),
-                message: `Daily loss limit of $${this.config.maxDailyLoss} reached`,
-            });
-            return;
-        }
-
-        this.updateState({
-            status: 'scanning',
-            statusMessage: 'Scanning for arbitrage opportunities...',
-        });
+        this.isScanning = true;
 
         try {
-            // Fetch opportunities from API
-            const response = await fetch(`${this.apiBaseUrl}/api/arbitrage/scan`);
-            if (!response.ok) throw new Error(`API error: ${response.status}`);
+            if (this.state.status !== 'running') return;
 
-            const data = await response.json();
-            const opportunities: ArbitrageOpportunity[] = data.opportunities || [];
+            // Check daily limits
+            if (this.state.tradesCount >= this.config.maxDailyTrades) {
+                this.updateState({
+                    status: 'paused',
+                    statusMessage: 'Daily trade limit reached',
+                });
+                this.emitEvent({
+                    type: 'daily_limit_reached',
+                    timestamp: new Date().toISOString(),
+                    message: `Daily trade limit of ${this.config.maxDailyTrades} reached`,
+                });
+                return;
+            }
 
-            // Filter opportunities based on config
-            const validOpportunities = opportunities.filter(opp => {
-                // Check profit threshold
-                const profitPercent = (1 - opp.totalCost) * 100;
-                if (profitPercent < this.config.minProfitPercent) return false;
-
-                // Check similarity threshold
-                const similarity = opp.similarity ?? 1.0;
-                if (similarity < this.config.similarityThreshold) return false;
-
-                // Check cooldown
-                const market1Key = `${opp.platform1.name}-${opp.platform1.marketId}`;
-                const market2Key = `${opp.platform2.name}-${opp.platform2.marketId}`;
-                const now = Date.now();
-
-                if (this.cooldownMarkets.has(market1Key) &&
-                    this.cooldownMarkets.get(market1Key)! > now) return false;
-                if (this.cooldownMarkets.has(market2Key) &&
-                    this.cooldownMarkets.get(market2Key)! > now) return false;
-
-                // Check platform filter
-                if (!this.config.platforms.includes(opp.platform1.name as 'polymarket' | 'kalshi')) return false;
-                if (opp.type === 'cross-platform' &&
-                    !this.config.platforms.includes(opp.platform2.name as 'polymarket' | 'kalshi')) return false;
-
-                return true;
-            });
-
-            // Update state with opportunities
-            const botOpportunities: BotOpportunity[] = validOpportunities.map(opp => ({
-                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                timestamp: new Date().toISOString(),
-                type: opp.type,
-                polymarket: opp.platform1.name === 'polymarket' ? {
-                    marketId: opp.platform1.marketId,
-                    question: opp.platform1.question || opp.question,
-                    yesPrice: opp.platform1.yesPrice,
-                    noPrice: opp.platform1.noPrice,
-                } : opp.platform2.name === 'polymarket' ? {
-                    marketId: opp.platform2.marketId,
-                    question: opp.platform2.question || opp.question,
-                    yesPrice: opp.platform2.yesPrice,
-                    noPrice: opp.platform2.noPrice,
-                } : undefined,
-                kalshi: opp.platform1.name === 'kalshi' ? {
-                    ticker: opp.platform1.marketId,
-                    question: opp.platform1.question || opp.question,
-                    yesPrice: opp.platform1.yesPrice,
-                    noPrice: opp.platform1.noPrice,
-                } : opp.platform2.name === 'kalshi' ? {
-                    ticker: opp.platform2.marketId,
-                    question: opp.platform2.question || opp.question,
-                    yesPrice: opp.platform2.yesPrice,
-                    noPrice: opp.platform2.noPrice,
-                } : undefined,
-                strategy: opp.strategy as BotOpportunity['strategy'],
-                totalCost: opp.totalCost,
-                profitPercent: (1 - opp.totalCost) * 100,
-                similarity: opp.similarity ?? 1.0,
-            }));
-
-            this.updateState({
-                recentOpportunities: botOpportunities.slice(0, 10),
-            });
-
-            // Handle opportunities based on execution mode
-            for (const opp of botOpportunities) {
-                if (this.config.executionMode === 'auto') {
-                    await this.executeOpportunity(opp);
-                } else if (this.config.executionMode === 'semi-auto') {
-                    this.requestConfirmation(opp);
-                } else {
-                    // Manual mode - just emit event
-                    this.emitEvent({
-                        type: 'opportunity_found',
-                        timestamp: new Date().toISOString(),
-                        message: `Opportunity found: ${opp.profitPercent.toFixed(2)}% profit`,
-                        data: opp,
-                    });
-                }
+            if (this.state.lossToday >= this.config.maxDailyLoss) {
+                this.updateState({
+                    status: 'paused',
+                    statusMessage: 'Daily loss limit reached',
+                });
+                this.emitEvent({
+                    type: 'daily_limit_reached',
+                    timestamp: new Date().toISOString(),
+                    message: `Daily loss limit of $${this.config.maxDailyLoss} reached`,
+                });
+                return;
             }
 
             this.updateState({
-                status: 'running',
-                statusMessage: botOpportunities.length > 0
-                    ? `Found ${botOpportunities.length} opportunities`
-                    : 'Scanning for opportunities...',
+                status: 'scanning',
+                statusMessage: 'Scanning for arbitrage opportunities...',
             });
 
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            this.updateState({
-                lastError: message,
-                errorCount: this.state.errorCount + 1,
-            });
+            try {
+                // Fetch opportunities from API
+                const response = await fetch(`${this.apiBaseUrl}/api/arbitrage/scan`);
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-            this.emitEvent({
-                type: 'error',
-                timestamp: new Date().toISOString(),
-                message: `Scan error: ${message}`,
-            });
+                const data = await response.json();
+                const opportunities: ArbitrageOpportunity[] = data.opportunities || [];
+
+                // Filter opportunities based on config
+                const validOpportunities = opportunities.filter(opp => {
+                    // Check profit threshold
+                    const profitPercent = (1 - opp.totalCost) * 100;
+                    if (profitPercent < this.config.minProfitPercent) return false;
+
+                    // Check similarity threshold
+                    const similarity = opp.similarity ?? 1.0;
+                    if (similarity < this.config.similarityThreshold) return false;
+
+                    // Check cooldown
+                    const market1Key = `${opp.platform1.name}-${opp.platform1.marketId}`;
+                    const market2Key = `${opp.platform2.name}-${opp.platform2.marketId}`;
+                    const now = Date.now();
+
+                    if (this.cooldownMarkets.has(market1Key) &&
+                        this.cooldownMarkets.get(market1Key)! > now) return false;
+                    if (this.cooldownMarkets.has(market2Key) &&
+                        this.cooldownMarkets.get(market2Key)! > now) return false;
+
+                    // Check platform filter
+                    if (!this.config.platforms.includes(opp.platform1.name as 'polymarket' | 'kalshi')) return false;
+                    if (opp.type === 'cross-platform' &&
+                        !this.config.platforms.includes(opp.platform2.name as 'polymarket' | 'kalshi')) return false;
+
+                    return true;
+                });
+
+                // Update state with opportunities
+                const botOpportunities: BotOpportunity[] = validOpportunities.map(opp => ({
+                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    timestamp: new Date().toISOString(),
+                    type: opp.type,
+                    polymarket: opp.platform1.name === 'polymarket' ? {
+                        marketId: opp.platform1.marketId,
+                        question: opp.platform1.question || opp.question,
+                        yesPrice: opp.platform1.yesPrice,
+                        noPrice: opp.platform1.noPrice,
+                    } : opp.platform2.name === 'polymarket' ? {
+                        marketId: opp.platform2.marketId,
+                        question: opp.platform2.question || opp.question,
+                        yesPrice: opp.platform2.yesPrice,
+                        noPrice: opp.platform2.noPrice,
+                    } : undefined,
+                    kalshi: opp.platform1.name === 'kalshi' ? {
+                        ticker: opp.platform1.marketId,
+                        question: opp.platform1.question || opp.question,
+                        yesPrice: opp.platform1.yesPrice,
+                        noPrice: opp.platform1.noPrice,
+                    } : opp.platform2.name === 'kalshi' ? {
+                        ticker: opp.platform2.marketId,
+                        question: opp.platform2.question || opp.question,
+                        yesPrice: opp.platform2.yesPrice,
+                        noPrice: opp.platform2.noPrice,
+                    } : undefined,
+                    strategy: opp.strategy as BotOpportunity['strategy'],
+                    totalCost: opp.totalCost,
+                    profitPercent: (1 - opp.totalCost) * 100,
+                    similarity: opp.similarity ?? 1.0,
+                }));
+
+                this.updateState({
+                    recentOpportunities: botOpportunities.slice(0, 10),
+                });
+
+                // Handle opportunities based on execution mode
+                for (const opp of botOpportunities) {
+                    if (this.config.executionMode === 'auto') {
+                        await this.executeOpportunity(opp);
+                    } else if (this.config.executionMode === 'semi-auto') {
+                        this.requestConfirmation(opp);
+                    } else {
+                        // Manual mode - just emit event
+                        this.emitEvent({
+                            type: 'opportunity_found',
+                            timestamp: new Date().toISOString(),
+                            message: `Opportunity found: ${opp.profitPercent.toFixed(2)}% profit`,
+                            data: opp,
+                        });
+                    }
+                }
+
+                this.updateState({
+                    status: 'running',
+                    statusMessage: botOpportunities.length > 0
+                        ? `Found ${botOpportunities.length} opportunities`
+                        : 'Scanning for opportunities...',
+                });
+
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                this.updateState({
+                    lastError: message,
+                    errorCount: this.state.errorCount + 1,
+                });
+
+                this.emitEvent({
+                    type: 'error',
+                    timestamp: new Date().toISOString(),
+                    message: `Scan error: ${message}`,
+                });
+            }
+        } finally {
+            this.isScanning = false;
         }
     }
 

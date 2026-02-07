@@ -12,17 +12,19 @@ import {
 } from '@/lib/bot/types';
 import { ArbitrageBot, initializeBot } from '@/lib/bot/engine';
 import { ProbabilityBar } from '@/components/charts';
+import { useMarketStream } from '@/hooks/useMarketStream';
 
 export default function BotDashboard() {
     const [config, setConfig] = useState<BotConfig>(DEFAULT_BOT_CONFIG);
     const [state, setState] = useState<BotState>(INITIAL_BOT_STATE);
     const [events, setEvents] = useState<BotEvent[]>([]);
-    const [isInitialized, setIsInitialized] = useState(false);
     const botRef = useRef<ArbitrageBot | null>(null);
+    const initialConfigRef = useRef(DEFAULT_BOT_CONFIG);
+    const { snapshot, isConnected: streamConnected } = useMarketStream();
 
     // Initialize bot
     useEffect(() => {
-        const bot = initializeBot(config, {}, '');
+        const bot = initializeBot(initialConfigRef.current, {}, '');
         botRef.current = bot;
 
         const unsubState = bot.onStateChange((newState) => {
@@ -32,8 +34,6 @@ export default function BotDashboard() {
         const unsubEvent = bot.onEvent((event) => {
             setEvents(prev => [event, ...prev].slice(0, 50));
         });
-
-        setIsInitialized(true);
 
         return () => {
             unsubState();
@@ -88,7 +88,7 @@ export default function BotDashboard() {
             case 'scanning':
                 return 'bg-green-500';
             case 'executing':
-                return 'bg-blue-500 animate-pulse';
+                return 'bg-accent-cyan animate-pulse';
             case 'paused':
                 return 'bg-yellow-500';
             case 'error':
@@ -125,9 +125,9 @@ export default function BotDashboard() {
             case 'started':
                 return 'text-green-400';
             case 'opportunity_found':
-                return 'text-purple-400';
+                return 'text-brand-300';
             case 'trade_pending':
-                return 'text-blue-400';
+                return 'text-accent-cyan';
             case 'error':
             case 'trade_failed':
                 return 'text-red-400';
@@ -139,18 +139,27 @@ export default function BotDashboard() {
     };
 
     return (
-        <div className="min-h-screen py-8 px-4">
+        <div className="min-h-screen terminal-bg py-8 px-4">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-white text-gradient-brand flex items-center gap-3">
                             <span className="text-2xl">🤖</span>
                             Arbitrage Bot
                         </h1>
                         <p className="text-slate-400 mt-1">
                             Automated arbitrage detection and execution
                         </p>
+                    </div>
+
+                    <div className="hidden md:flex items-center gap-2 text-xs text-slate-500">
+                        <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
+                            Stream {streamConnected ? 'Connected' : 'Offline'}
+                        </span>
+                        {snapshot?.updatedAt && (
+                            <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
                     </div>
 
                     {/* Control Buttons */}
@@ -204,10 +213,10 @@ export default function BotDashboard() {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     {/* Status */}
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400 mb-2">Status</div>
                         <div className="flex items-center gap-2">
-                            <span className={`w-3 h-3 rounded-full ${getStatusColor(state.status)}`} />
+                            <span className={`w-3 h-3 rounded-full ${getStatusColor(state.status)}`}></span>
                             <span className="text-xl font-bold text-white capitalize">
                                 {state.status}
                             </span>
@@ -218,7 +227,7 @@ export default function BotDashboard() {
                     </div>
 
                     {/* Today's P&L */}
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400 mb-2">Today&apos;s P&L</div>
                         <div className={`text-2xl font-bold ${state.profitToday >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {state.profitToday >= 0 ? '+' : ''}${state.profitToday.toFixed(2)}
@@ -229,18 +238,16 @@ export default function BotDashboard() {
                     </div>
 
                     {/* Active Positions */}
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400 mb-2">Active Positions</div>
-                        <div className="text-2xl font-bold text-white">
-                            {state.activePositions.length}
-                        </div>
+                        <div className="text-2xl font-bold text-white">{state.activePositions.length}</div>
                         <div className="text-xs text-slate-500 mt-1">
                             Opportunities: {state.recentOpportunities.length}
                         </div>
                     </div>
 
                     {/* Daily Limit */}
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400 mb-2">Daily Trades</div>
                         <div className="flex items-center gap-2">
                             <span className="text-2xl font-bold text-white">
@@ -260,7 +267,7 @@ export default function BotDashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Configuration Panel */}
                     <div className="lg:col-span-1">
-                        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+                        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50 glass">
                             <h2 className="text-lg font-semibold text-white mb-4">Configuration</h2>
 
                             {/* Strategy Selector */}
@@ -273,9 +280,9 @@ export default function BotDashboard() {
                                             onClick={() => handleStrategyChange(strategy)}
                                             className={`px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize ${config.strategy === strategy
                                                     ? strategy === 'conservative'
-                                                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                                                        ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50'
                                                         : strategy === 'balanced'
-                                                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
+                                                            ? 'bg-brand-500/20 text-brand-300 border border-brand-500/50'
                                                             : 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
                                                     : 'bg-slate-700/50 text-slate-400 border border-slate-600/50 hover:border-slate-500'
                                                 }`}
@@ -298,7 +305,7 @@ export default function BotDashboard() {
                                     step="0.1"
                                     value={config.minProfitPercent}
                                     onChange={(e) => handleConfigChange('minProfitPercent', parseFloat(e.target.value))}
-                                    className="w-full accent-purple-500"
+                                    className="w-full accent-brand-500"
                                 />
                             </div>
 
@@ -346,7 +353,7 @@ export default function BotDashboard() {
                                             handleConfigChange('platforms', platforms);
                                         }}
                                         className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${config.platforms.includes('polymarket')
-                                                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
+                                                ? 'bg-brand-500/20 text-brand-300 border border-brand-500/50'
                                                 : 'bg-slate-700/50 text-slate-500 border border-slate-600/50'
                                             }`}
                                     >
@@ -360,7 +367,7 @@ export default function BotDashboard() {
                                             handleConfigChange('platforms', platforms);
                                         }}
                                         className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${config.platforms.includes('kalshi')
-                                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                                                ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50'
                                                 : 'bg-slate-700/50 text-slate-500 border border-slate-600/50'
                                             }`}
                                     >
@@ -396,12 +403,12 @@ export default function BotDashboard() {
 
                     {/* Activity Feed */}
                     <div className="lg:col-span-2">
-                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
+                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 glass">
                             <div className="px-6 py-4 border-b border-slate-700/50">
                                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                                     📊 Live Activity
                                     {(state.status === 'running' || state.status === 'scanning') && (
-                                        <span className="relative flex h-2 w-2">
+                                        <span className="relative flex h-2 w-2 ml-2">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                         </span>
@@ -440,7 +447,7 @@ export default function BotDashboard() {
 
                         {/* Recent Opportunities */}
                         {state.recentOpportunities.length > 0 && (
-                            <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                            <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700/50 glass">
                                 <div className="px-6 py-4 border-b border-slate-700/50">
                                     <h2 className="text-lg font-semibold text-white">
                                         🎯 Current Opportunities

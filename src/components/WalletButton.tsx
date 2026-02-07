@@ -1,6 +1,7 @@
 'use client';
 
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import Image from 'next/image';
 
 export function WalletButton() {
     return (
@@ -18,21 +19,23 @@ export function WalletButton() {
 
                 return (
                     <div
-                        {...(!ready && {
-                            'aria-hidden': true,
-                            style: {
-                                opacity: 0,
-                                pointerEvents: 'none',
-                                userSelect: 'none',
-                            },
-                        })}
                     >
                         {(() => {
+                            if (!ready) {
+                                return (
+                                    <button
+                                        className="px-4 py-2 bg-slate-800 text-slate-400 font-semibold rounded-lg text-sm cursor-wait"
+                                        disabled
+                                    >
+                                        Initializing...
+                                    </button>
+                                );
+                            }
                             if (!connected) {
                                 return (
                                     <button
                                         onClick={openConnectModal}
-                                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all text-sm"
+                                        className="px-4 py-2 bg-gradient-to-r from-brand-500 to-accent-cyan hover:from-brand-600 hover:to-accent-cyan text-white font-semibold rounded-lg transition-all text-sm shadow-glow-sm"
                                     >
                                         Connect Wallet
                                     </button>
@@ -57,9 +60,11 @@ export function WalletButton() {
                                         className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
                                     >
                                         {chain.hasIcon && chain.iconUrl && (
-                                            <img
+                                            <Image
                                                 src={chain.iconUrl}
                                                 alt={chain.name ?? 'Chain'}
+                                                width={16}
+                                                height={16}
                                                 className="w-4 h-4 rounded-full"
                                             />
                                         )}
@@ -68,14 +73,14 @@ export function WalletButton() {
 
                                     <button
                                         onClick={openAccountModal}
-                                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 text-white rounded-lg text-sm transition-colors"
+                                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-500/15 to-accent-cyan/15 hover:from-brand-500/25 hover:to-accent-cyan/25 border border-brand-500/30 text-white rounded-lg text-sm transition-colors"
                                     >
                                         {account.displayBalance && (
                                             <span className="text-slate-300">
                                                 {account.displayBalance}
                                             </span>
                                         )}
-                                        <span className="font-mono text-purple-400">
+                                        <span className="font-mono text-brand-300">
                                             {account.displayName}
                                         </span>
                                     </button>
@@ -85,6 +90,6 @@ export function WalletButton() {
                     </div>
                 );
             }}
-        </ConnectButton.Custom>
+        </ConnectButton.Custom >
     );
 }

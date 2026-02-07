@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 import { ArbitrageOpportunity } from '@/lib/kalshi/types';
 import {
@@ -12,6 +12,8 @@ import {
 import { deriveApiCredentials, PolymarketCredentials } from '@/lib/polymarket/trading';
 import { KalshiCredentials } from '@/lib/kalshi/trading';
 import { usePortfolio } from '@/contexts/PortfolioContext';
+import { TrustBadge } from './TrustBadge';
+import { TradeTrustSnapshot } from '@/lib/portfolio/types';
 
 interface ExecuteArbitrageModalProps {
     opportunity: ArbitrageOpportunity;
@@ -34,7 +36,7 @@ function StepIndicator({
     const getStepClass = () => {
         if (status === 'completed') return 'bg-green-500 border-green-500';
         if (status === 'failed') return 'bg-red-500 border-red-500';
-        if (status === 'active') return 'bg-purple-500 border-purple-500 animate-pulse';
+        if (status === 'active') return 'bg-brand-500 border-brand-500 animate-pulse';
         if (step < currentStep) return 'bg-slate-600 border-slate-600';
         return 'bg-slate-800 border-slate-600';
     };
@@ -153,30 +155,94 @@ export function ExecuteArbitrageModalV2({
     const [kalshiPrivateKey, setKalshiPrivateKey] = useState('');
     const [currentStep, setCurrentStep] = useState(0);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [trustLegs, setTrustLegs] = useState<Array<{
+        platform: 'polymarket' | 'kalshi';
+        marketId: string;
+        trustScore: number;
+        disputeRisk: number;
+        resolutionConfidence: number;
+    }>>([]);
 
     // Calculate estimated slippage based on order size and liquidity
     const contracts = Math.floor(parseFloat(amount || '0') / opportunity.totalCost);
     const estimatedProfit = contracts * opportunity.guaranteedProfit;
     const estimatedSlippage = Math.min(contracts * 0.05, 5); // Rough estimate
 
-    // Reset state when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            setProgress(null);
-            setResult(null);
-            setError(null);
-            setCurrentStep(0);
-        }
-    }, [isOpen]);
+    const resetProgressState = useCallback(() => {
+        setProgress(null);
+        setResult(null);
+        setError(null);
+        setCurrentStep(0);
+    }, []);
 
-    // Update step based on progress
+    const handleClose = useCallback(() => {
+        resetProgressState();
+        onClose();
+    }, [onClose, resetProgressState]);
+
+    const handleProgressUpdate = useCallback((next: ExecutionProgress) => {
+        setProgress(next);
+        if (next.status === 'placing-orders') setCurrentStep(2);
+        else if (next.status === 'confirming') setCurrentStep(3);
+        else if (next.status === 'completed') setCurrentStep(4);
+    }, []);
+
     useEffect(() => {
-        if (progress) {
-            if (progress.status === 'placing-orders') setCurrentStep(2);
-            else if (progress.status === 'confirming') setCurrentStep(3);
-            else if (progress.status === 'completed') setCurrentStep(4);
-        }
-    }, [progress]);
+        let active = true;
+        const fetchTrust = async () => {
+            try {
+                const [res1, res2] = await Promise.all([
+                    fetch(`/api/trust/market?platform=${opportunity.platform1.name}&id=${opportunity.platform1.marketId}`),
+                    fetch(`/api/trust/market?platform=${opportunity.platform2.name}&id=${opportunity.platform2.marketId}`),
+                ]);
+
+                const legs: Array<{
+                    platform: 'polymarket' | 'kalshi';
+                    marketId: string;
+                    trustScore: number;
+                    disputeRisk: number;
+                    resolutionConfidence: number;
+                }> = [];
+
+                const pushLeg = (
+                    platform: 'polymarket' | 'kalshi',
+                    marketId: string,
+                    analysis?: { trustScore: number; disputeRisk: number; resolutionConfidence: number }
+                ) => {
+                    if (!analysis) return;
+                    legs.push({
+                        platform,
+                        marketId,
+                        trustScore: analysis.trustScore,
+                        disputeRisk: analysis.disputeRisk,
+                        resolutionConfidence: analysis.resolutionConfidence,
+                    });
+                };
+
+                if (res1.ok) {
+                    const data = await res1.json();
+                    pushLeg(opportunity.platform1.name, opportunity.platform1.marketId, data.analysis);
+                }
+                if (res2.ok) {
+                    const data = await res2.json();
+                    pushLeg(opportunity.platform2.name, opportunity.platform2.marketId, data.analysis);
+                }
+
+                if (active) {
+                    const unique = new Map<string, typeof legs[number]>();
+                    legs.forEach((leg) => unique.set(`${leg.platform}:${leg.marketId}`, leg));
+                    setTrustLegs(Array.from(unique.values()));
+                }
+            } catch {
+                if (active) setTrustLegs([]);
+            }
+        };
+
+        fetchTrust();
+        return () => {
+            active = false;
+        };
+    }, [opportunity]);
 
     if (!isOpen) return null;
 
@@ -239,7 +305,7 @@ export function ExecuteArbitrageModalV2({
                 opportunity,
                 credentials,
                 parseFloat(amount),
-                setProgress
+                handleProgressUpdate
             );
 
             setResult(executionResult);
@@ -247,6 +313,55 @@ export function ExecuteArbitrageModalV2({
 
             // Add to portfolio if successful
             if (executionResult.success) {
+                const trustSnapshot: TradeTrustSnapshot | undefined = await (async () => {
+                    try {
+                        const [trust1Res, trust2Res] = await Promise.all([
+                            fetch(`/api/trust/market?platform=${opportunity.platform1.name}&id=${opportunity.platform1.marketId}`),
+                            fetch(`/api/trust/market?platform=${opportunity.platform2.name}&id=${opportunity.platform2.marketId}`),
+                        ]);
+
+                        const legs: TradeTrustSnapshot['legs'] = [];
+
+                        if (trust1Res.ok) {
+                            const data = await trust1Res.json();
+                            if (data.analysis) {
+                                legs.push({
+                                    platform: opportunity.platform1.name,
+                                    marketId: opportunity.platform1.marketId,
+                                    trustScore: data.analysis.trustScore,
+                                    resolutionConfidence: data.analysis.resolutionConfidence,
+                                    disputeRisk: data.analysis.disputeRisk,
+                                    integrityRisk: data.analysis.integrityRisk,
+                                    evidenceCount: data.analysis.evidenceCount,
+                                });
+                            }
+                        }
+
+                        if (trust2Res.ok) {
+                            const data = await trust2Res.json();
+                            if (data.analysis) {
+                                legs.push({
+                                    platform: opportunity.platform2.name,
+                                    marketId: opportunity.platform2.marketId,
+                                    trustScore: data.analysis.trustScore,
+                                    resolutionConfidence: data.analysis.resolutionConfidence,
+                                    disputeRisk: data.analysis.disputeRisk,
+                                    integrityRisk: data.analysis.integrityRisk,
+                                    evidenceCount: data.analysis.evidenceCount,
+                                });
+                            }
+                        }
+
+                        if (legs.length === 0) return undefined;
+                        return {
+                            evaluatedAt: Date.now(),
+                            legs,
+                        };
+                    } catch {
+                        return undefined;
+                    }
+                })();
+
                 const now = Date.now();
 
                 // Add trades for each leg
@@ -317,6 +432,7 @@ export function ExecuteArbitrageModalV2({
                     expectedProfit: executionResult.estimatedProfit,
                     expectedProfitPercent: opportunity.profitPercentage,
                     status: 'executed',
+                    trustSnapshot,
                 });
             }
         } catch (err) {
@@ -334,7 +450,7 @@ export function ExecuteArbitrageModalV2({
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/70 backdrop-blur-md"
-                onClick={onClose}
+                onClick={handleClose}
             />
 
             {/* Modal */}
@@ -348,7 +464,7 @@ export function ExecuteArbitrageModalV2({
                         </p>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,16 +505,35 @@ export function ExecuteArbitrageModalV2({
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                                    <span className="w-2 h-2 rounded-full bg-brand-500" />
                                     <span className="text-slate-400">Polymarket:</span>
                                     <span className="text-white font-mono">{(opportunity.platform1.yesPrice * 100).toFixed(1)}%</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                    <span className="w-2 h-2 rounded-full bg-accent-cyan" />
                                     <span className="text-slate-400">Kalshi:</span>
                                     <span className="text-white font-mono">{(opportunity.platform2.yesPrice * 100).toFixed(1)}%</span>
                                 </div>
                             </div>
+
+                            {trustLegs.length > 0 && (
+                                <div className="mt-4 space-y-2 text-xs text-slate-400">
+                                    <div className="text-slate-500 uppercase tracking-wide">Trust Snapshot</div>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {trustLegs.map((leg) => (
+                                            <div key={`${leg.platform}-${leg.marketId}`} className="flex items-center justify-between">
+                                                <span className={leg.platform === 'polymarket' ? 'text-brand-300' : 'text-accent-cyan'}>
+                                                    {leg.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <TrustBadge score={leg.trustScore} compact />
+                                                    <span className="text-slate-500">Dispute {leg.disputeRisk}%</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Slippage Warning */}
@@ -425,7 +560,7 @@ export function ExecuteArbitrageModalV2({
                                     <div className={`rounded-xl p-3 border transition-colors ${polyCredentials ? 'bg-green-500/5 border-green-500/30' : 'bg-slate-800/30 border-slate-700/30'}`}>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <span className="w-3 h-3 rounded-full bg-purple-500" />
+                                                <span className="w-3 h-3 rounded-full bg-brand-500" />
                                                 <span className="text-sm font-medium text-white">Polymarket</span>
                                             </div>
                                             {polyCredentials ? (
@@ -438,7 +573,7 @@ export function ExecuteArbitrageModalV2({
                                             ) : (
                                                 <button
                                                     onClick={handleDerivePolymarketKey}
-                                                    className="text-xs px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors"
+                                                    className="text-xs px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 rounded-lg transition-colors"
                                                 >
                                                     Sign to Connect
                                                 </button>
@@ -451,7 +586,7 @@ export function ExecuteArbitrageModalV2({
                                     <div className={`rounded-xl p-3 border transition-colors ${kalshiCredentials ? 'bg-green-500/5 border-green-500/30' : 'bg-slate-800/30 border-slate-700/30'}`}>
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="w-3 h-3 rounded-full bg-blue-500" />
+                                                <span className="w-3 h-3 rounded-full bg-accent-cyan" />
                                                 <span className="text-sm font-medium text-white">Kalshi</span>
                                             </div>
                                             {kalshiCredentials && (
@@ -470,19 +605,19 @@ export function ExecuteArbitrageModalV2({
                                                     placeholder="API Key ID"
                                                     value={kalshiApiKey}
                                                     onChange={(e) => setKalshiApiKey(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                                                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-accent-cyan focus:outline-none"
                                                 />
                                                 <input
                                                     type="password"
                                                     placeholder="Private Key"
                                                     value={kalshiPrivateKey}
                                                     onChange={(e) => setKalshiPrivateKey(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                                                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-accent-cyan focus:outline-none"
                                                 />
                                                 <button
                                                     onClick={handleSaveKalshiCredentials}
                                                     disabled={!kalshiApiKey || !kalshiPrivateKey}
-                                                    className="w-full text-xs px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors disabled:opacity-50"
+                                                    className="w-full text-xs px-3 py-2 bg-accent-cyan/20 hover:bg-accent-cyan/30 text-accent-cyan rounded-lg transition-colors disabled:opacity-50"
                                                 >
                                                     Save Credentials
                                                 </button>
@@ -505,7 +640,7 @@ export function ExecuteArbitrageModalV2({
                                         onChange={(e) => setAmount(e.target.value)}
                                         min="1"
                                         step="1"
-                                        className="w-full pl-8 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg font-mono focus:border-purple-500 focus:outline-none"
+                                        className="w-full pl-8 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg font-mono focus:border-brand-500 focus:outline-none"
                                     />
                                 </div>
                                 <div className="flex justify-between text-sm mt-2">
@@ -520,7 +655,7 @@ export function ExecuteArbitrageModalV2({
                                             key={val}
                                             onClick={() => setAmount(val.toString())}
                                             className={`flex-1 py-1.5 text-xs rounded-lg transition-colors ${amount === val.toString()
-                                                ? 'bg-purple-500/30 text-purple-400 border border-purple-500/50'
+                                                ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
                                                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                                 }`}
                                         >
@@ -553,7 +688,7 @@ export function ExecuteArbitrageModalV2({
                                                     key={val}
                                                     onClick={() => setSlippageTolerance(val)}
                                                     className={`flex-1 py-1.5 text-xs rounded-lg transition-colors ${slippageTolerance === val
-                                                        ? 'bg-purple-500/30 text-purple-400 border border-purple-500/50'
+                                                        ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
                                                         : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                                         }`}
                                                 >
@@ -571,7 +706,7 @@ export function ExecuteArbitrageModalV2({
                             <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="relative w-6 h-6">
-                                        <svg className="animate-spin w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24">
+                                        <svg className="animate-spin w-6 h-6 text-brand-300" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
@@ -582,7 +717,7 @@ export function ExecuteArbitrageModalV2({
                                     {progress.orders.map((order, i) => (
                                         <div key={i} className="flex items-center justify-between text-sm bg-slate-900/50 rounded-lg p-2">
                                             <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${order.platform === 'polymarket' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                                                <span className={`w-2 h-2 rounded-full ${order.platform === 'polymarket' ? 'bg-brand-500' : 'bg-accent-cyan'}`} />
                                                 <span className="text-slate-400">{order.platform}</span>
                                             </div>
                                             <span className={
@@ -634,7 +769,7 @@ export function ExecuteArbitrageModalV2({
                     {result && result.success && (
                         <a
                             href="/portfolio"
-                            className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all text-center"
+                            className="flex-1 px-4 py-3 bg-gradient-to-r from-brand-500 to-accent-cyan hover:from-brand-600 hover:to-accent-cyan text-white font-semibold rounded-xl transition-all text-center"
                         >
                             View Portfolio
                         </a>

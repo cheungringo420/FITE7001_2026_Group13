@@ -16,7 +16,6 @@ const embeddingCache = new Map<string, number[]>();
 // OpenAI API configuration
 const OPENAI_API_URL = 'https://api.openai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
-const EMBEDDING_DIMENSIONS = 1536; // Default dimensions for text-embedding-3-small
 
 // Force OpenAI usage even if local is available
 const FORCE_OPENAI = process.env.USE_OPENAI === 'true';
@@ -272,7 +271,18 @@ export async function calculateSemanticSimilarity(
         return null;
     }
 
-    return cosineSimilarity(embedding1, embedding2);
+    // Guard against dimension mismatch (local=384, OpenAI=1536)
+    if (embedding1.length !== embedding2.length) {
+        console.warn(`[Embeddings] Dimension mismatch: ${embedding1.length} vs ${embedding2.length}, returning null`);
+        return null;
+    }
+
+    try {
+        return cosineSimilarity(embedding1, embedding2);
+    } catch (error) {
+        console.error('[Embeddings] cosineSimilarity failed:', error);
+        return null;
+    }
 }
 
 /**

@@ -1,7 +1,5 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-
 interface LivePriceIndicatorProps {
     price: number;
     previousPrice?: number;
@@ -21,23 +19,10 @@ export function LivePriceIndicator({
     className = '',
     isLive = false,
 }: LivePriceIndicatorProps) {
-    const [isFlashing, setIsFlashing] = useState(false);
-    const [flashDirection, setFlashDirection] = useState<'up' | 'down' | null>(null);
-
     const change = previousPrice !== undefined ? price - previousPrice : null;
     const changePercent = previousPrice && previousPrice !== 0
         ? ((price - previousPrice) / previousPrice) * 100
         : null;
-
-    // Flash animation on price change
-    useEffect(() => {
-        if (change && change !== 0) {
-            setFlashDirection(change > 0 ? 'up' : 'down');
-            setIsFlashing(true);
-            const timer = setTimeout(() => setIsFlashing(false), 500);
-            return () => clearTimeout(timer);
-        }
-    }, [price, change]);
 
     const sizeClasses = {
         sm: 'text-lg',
@@ -46,19 +31,20 @@ export function LivePriceIndicator({
     };
 
     const baseColor = side === 'yes' ? 'text-green-400' : 'text-red-400';
-    const flashColor = flashDirection === 'up'
-        ? 'bg-green-500/30'
-        : flashDirection === 'down'
-            ? 'bg-red-500/30'
-            : '';
+    const flashClass = change !== null && change !== 0
+        ? change > 0
+            ? 'flash-green'
+            : 'flash-red'
+        : '';
 
     return (
         <div className={`relative inline-flex items-center gap-2 ${className}`}>
             {/* Price with flash effect */}
             <div
+                key={`${price}-${flashClass}`}
                 className={`
                     ${sizeClasses[size]} font-bold ${baseColor}
-                    ${isFlashing ? `${flashColor} rounded-lg px-2 -mx-2` : ''}
+                    ${flashClass ? `rounded-lg px-2 -mx-2 ${flashClass}` : ''}
                     transition-all duration-300
                 `}
             >
@@ -133,7 +119,7 @@ export function ConnectionStatus({
             <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${getStatusColor(polymarketStatus)}`} />
                 <span className="text-xs text-slate-400">
-                    <span className="text-purple-400">Polymarket</span>
+                    <span className="text-brand-300">Polymarket</span>
                     {' '}
                     <span className={polymarketStatus === 'connected' ? 'text-green-400' : 'text-slate-500'}>
                         {getStatusText(polymarketStatus)}
@@ -145,7 +131,7 @@ export function ConnectionStatus({
             <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${getStatusColor(kalshiStatus)}`} />
                 <span className="text-xs text-slate-400">
-                    <span className="text-blue-400">Kalshi</span>
+                    <span className="text-accent-cyan">Kalshi</span>
                     {' '}
                     <span className={kalshiStatus === 'connected' ? 'text-green-400' : 'text-slate-500'}>
                         {getStatusText(kalshiStatus)}
@@ -204,11 +190,11 @@ export function PriceComparison({
                 <div className="text-xs text-green-400 font-medium">Yes</div>
                 <div className="text-xs text-red-400 font-medium">No</div>
 
-                <div className="text-xs text-purple-400 font-medium text-left">Polymarket</div>
+                <div className="text-xs text-brand-300 font-medium text-left">Polymarket</div>
                 <div className="text-white font-bold">{(polymarketYes * 100).toFixed(1)}¢</div>
                 <div className="text-white font-bold">{(polymarketNo * 100).toFixed(1)}¢</div>
 
-                <div className="text-xs text-blue-400 font-medium text-left">Kalshi</div>
+                <div className="text-xs text-accent-cyan font-medium text-left">Kalshi</div>
                 <div className="text-white font-bold">{(kalshiYes * 100).toFixed(1)}¢</div>
                 <div className="text-white font-bold">{(kalshiNo * 100).toFixed(1)}¢</div>
             </div>

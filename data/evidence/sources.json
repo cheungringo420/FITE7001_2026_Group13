@@ -1,0 +1,44 @@
+[
+  {
+    "id": "fed",
+    "name": "Federal Reserve",
+    "reliability": 0.95,
+    "category": "official",
+    "url": "https://www.federalreserve.gov"
+  },
+  {
+    "id": "cbo",
+    "name": "Congressional Budget Office",
+    "reliability": 0.85,
+    "category": "official",
+    "url": "https://www.cbo.gov"
+  },
+  {
+    "id": "cme",
+    "name": "CME Group",
+    "reliability": 0.8,
+    "category": "market-data",
+    "url": "https://www.cmegroup.com"
+  },
+  {
+    "id": "nasa",
+    "name": "NASA",
+    "reliability": 0.9,
+    "category": "official",
+    "url": "https://www.nasa.gov"
+  },
+  {
+    "id": "coinmetrics",
+    "name": "Coin Metrics",
+    "reliability": 0.75,
+    "category": "analytics",
+    "url": "https://coinmetrics.io"
+  },
+  {
+    "id": "imf",
+    "name": "International Monetary Fund",
+    "reliability": 0.88,
+    "category": "official",
+    "url": "https://www.imf.org"
+  }
+]

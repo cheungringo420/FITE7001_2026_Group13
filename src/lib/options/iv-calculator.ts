@@ -152,7 +152,6 @@ export function impliedProbabilityFromPutCallParity(
     r: number
 ): ImpliedProbabilityResult {
     // Using risk-neutral probability approach
-    const forwardPrice = S * Math.exp(r * T);
     const discountFactor = Math.exp(-r * T);
 
     // The probability is approximated from delta hedge ratio

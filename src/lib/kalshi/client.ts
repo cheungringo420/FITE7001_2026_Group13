@@ -38,6 +38,8 @@ export async function fetchKalshiMarkets(params?: {
         headers: {
             'Accept': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -57,6 +59,8 @@ export async function fetchKalshiMarket(ticker: string): Promise<GetMarketRespon
         headers: {
             'Accept': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -90,6 +94,8 @@ export async function fetchKalshiEvents(params?: {
         headers: {
             'Accept': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -114,6 +120,8 @@ export async function fetchKalshiEvent(eventTicker: string, withMarkets = true):
         headers: {
             'Accept': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -133,6 +141,8 @@ export async function fetchKalshiOrderBook(ticker: string): Promise<GetOrderBook
         headers: {
             'Accept': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -374,15 +384,14 @@ export async function fetchAndNormalizeKalshiMarkets(limit = 100): Promise<Norma
             if (!title || title.length < 10) return false;
 
             const isSportsStats = /\d+\+|wins by over|points scored|rebounds|assists|touchdown|strikeouts|home runs|passing yards/i.test(title);
-            const isParlay = /^(yes|no)\s+/i.test(title) || /,(yes|no)\s+/i.test(title);
+            // Only filter as parlay if it contains comma-separated yes/no which indicates spread/parlay
+            const isParlay = /,(yes|no)\s+/i.test(title);
             const isPlayerBet = /^(yes|no)\s+[A-Z][a-z]+\s+[A-Z]/i.test(m.title || '');
 
-            // Accept markets that look like questions OR have substantial volume
-            const looksLikeQuestion = /^will\s|\?$/i.test(title) || /^(what|who|when|how|which|is|are|can|does|do)\b/i.test(title);
-            const hasGoodVolume = (m.volume || 0) > 10000; // volume > $100
             const isActive = m.status === 'open' || m.status === 'active';
 
-            return isActive && !isSportsStats && !isParlay && !isPlayerBet && (looksLikeQuestion || hasGoodVolume);
+            // Relaxed filter: Just ensure it's active and not spammy sports props
+            return isActive && !isSportsStats && !isParlay && !isPlayerBet;
         });
 
         let normalizedMarkets = normalizeList(primaryFiltered);

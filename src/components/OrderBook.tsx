@@ -31,9 +31,9 @@ export function OrderBook({ bids, asks, isLoading }: OrderBookProps) {
     }
 
     return (
-        <div className="order-book bg-slate-900/80 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+        <div className="order-book surface rounded-xl p-4">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2" style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}>
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 Order Book
             </h3>
 
@@ -68,9 +68,9 @@ export function OrderBook({ bids, asks, isLoading }: OrderBookProps) {
                                         <span className="relative z-10 text-slate-300">
                                             {parseFloat(bid.size).toFixed(2)}
                                         </span>
-                                        <span className="relative z-10 text-right text-green-400 font-mono">
-                                            ${parseFloat(bid.price).toFixed(2)}
-                                        </span>
+                    <span className="relative z-10 text-right text-emerald-400 font-mono">
+                        ${parseFloat(bid.price).toFixed(2)}
+                    </span>
                                     </>
                                 )}
                             </div>
@@ -83,7 +83,7 @@ export function OrderBook({ bids, asks, isLoading }: OrderBookProps) {
                                             className="absolute inset-y-0 left-0 bg-red-500/20 rounded-r"
                                             style={{ width: `${(parseFloat(ask.size) / maxSize) * 100}%` }}
                                         />
-                                        <span className="relative z-10 text-red-400 font-mono">
+                                        <span className="relative z-10 text-rose-400 font-mono">
                                             ${parseFloat(ask.price).toFixed(2)}
                                         </span>
                                         <span className="relative z-10 text-right text-slate-300">

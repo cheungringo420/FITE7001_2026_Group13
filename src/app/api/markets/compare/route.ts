@@ -3,11 +3,14 @@ import { parseMarket, Market } from '@/lib/polymarket';
 import { fetchAndNormalizeKalshiMarkets } from '@/lib/kalshi';
 import {
     normalizePolymarketMarket,
-    findMatchingMarkets,
     findMatchingMarketsAsync,
     detectArbitrage,
+    calculateResolutionAlignment,
 } from '@/lib/arbitrage';
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
+import { extractResolutionCriteria } from '@/lib/trust/criteria';
+import { ResolutionAlignmentBreakdown } from '@/lib/trust/types';
+import { getMatchFeedbackMap, getMatchKey } from '@/lib/feedback/matchFeedback';
 
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 
@@ -17,6 +20,8 @@ export interface MatchedMarketPair {
     kalshi: NormalizedMarket;
     similarity: number;
     arbitrage: ArbitrageOpportunity | null;
+    alignmentBreakdown: ResolutionAlignmentBreakdown;
+    flagged?: boolean;
 }
 
 export interface CompareResponse {
@@ -29,16 +34,69 @@ export interface CompareResponse {
     matchingMethod: 'semantic' | 'text';  // Indicates which matching algorithm was used
 }
 
-export async function GET() {
+function buildAlignmentBreakdown(
+    polymarket: NormalizedMarket,
+    kalshi: NormalizedMarket
+): ResolutionAlignmentBreakdown {
+    const polyCriteria = extractResolutionCriteria(polymarket.question, polymarket.description);
+    const kalshiCriteria = extractResolutionCriteria(kalshi.question, kalshi.description);
+
+    const timeWindowPoly = polyCriteria.timeWindow?.raw;
+    const timeWindowKalshi = kalshiCriteria.timeWindow?.raw;
+
+    const ambiguityMatch =
+        polyCriteria.ambiguityFlags.length === kalshiCriteria.ambiguityFlags.length &&
+        polyCriteria.ambiguityFlags.every((flag) => kalshiCriteria.ambiguityFlags.includes(flag));
+
+    return {
+        score: calculateResolutionAlignment(polymarket.question, kalshi.question),
+        criteria: {
+            explicitDate: {
+                polymarket: polyCriteria.hasExplicitDate,
+                kalshi: kalshiCriteria.hasExplicitDate,
+                match: polyCriteria.hasExplicitDate === kalshiCriteria.hasExplicitDate,
+            },
+            objectiveThreshold: {
+                polymarket: polyCriteria.hasObjectiveThreshold,
+                kalshi: kalshiCriteria.hasObjectiveThreshold,
+                match: polyCriteria.hasObjectiveThreshold === kalshiCriteria.hasObjectiveThreshold,
+            },
+            resolutionWording: {
+                polymarket: polyCriteria.hasResolutionWording,
+                kalshi: kalshiCriteria.hasResolutionWording,
+                match: polyCriteria.hasResolutionWording === kalshiCriteria.hasResolutionWording,
+            },
+            timeWindow: {
+                polymarket: timeWindowPoly,
+                kalshi: timeWindowKalshi,
+                match: (!timeWindowPoly && !timeWindowKalshi) || timeWindowPoly === timeWindowKalshi,
+            },
+            ambiguityFlags: {
+                polymarket: polyCriteria.ambiguityFlags,
+                kalshi: kalshiCriteria.ambiguityFlags,
+                match: ambiguityMatch,
+            },
+        },
+        clarity: {
+            polymarket: polyCriteria.clarityScore,
+            kalshi: kalshiCriteria.clarityScore,
+        },
+    };
+}
+
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const strict = searchParams.get('strict') === 'true';
+
         // Fetch markets from both platforms in parallel
-        const [polymarketRes, normalizedKalshi] = await Promise.all([
-            fetch(`${GAMMA_API_BASE}/markets?limit=1000&active=true&closed=false&enableOrderBook=true`, {
-                headers: { 'Accept': 'application/json' },
-                next: { revalidate: 60 },
-            }),
-            fetchAndNormalizeKalshiMarkets(1000)
-        ]);
+         const [polymarketRes, normalizedKalshi] = await Promise.all([
+             fetch(`${GAMMA_API_BASE}/markets?limit=100&active=true&closed=false&enableOrderBook=true`, {
+                 headers: { 'Accept': 'application/json' },
+                 next: { revalidate: 60 },
+             }),
+             fetchAndNormalizeKalshiMarkets(100)
+         ]);
 
         if (!polymarketRes.ok) {
             throw new Error(`Polymarket API error: ${polymarketRes.status}`);
@@ -60,12 +118,20 @@ export async function GET() {
 
         // Kalshi markets are already normalized by the helper
 
+        const feedbackMap = await getMatchFeedbackMap();
+
+        const penaltyFn = (polymarketId: string, kalshiId: string) => {
+            const entry = feedbackMap[getMatchKey(polymarketId, kalshiId)];
+            return entry?.status === 'mismatch' ? 0.2 : 1;
+        };
+
         // Find related markets across platforms using semantic matching
         // Uses OpenAI embeddings for better accuracy, falls back to text matching
         const { matches, matchingMethod } = await findMatchingMarketsAsync(
             normalizedPolymarket,
             normalizedKalshi,
-            0.30  // Use moderate threshold for semantic matching
+            strict ? 0.55 : 0.30,  // Use higher threshold for strict mode
+            { strict, penaltyFn }
         );
 
         console.log(`[Compare] Using ${matchingMethod} matching, found ${matches.length} potential matches`);
@@ -81,11 +147,12 @@ export async function GET() {
         const ARBITRAGE_SIMILARITY_THRESHOLD = 0.65;
 
         const matchedPairs: MatchedMarketPair[] = [];
-
         for (const match of matches) {
             // Create a unique key based on question texts to avoid duplicates
             // (Kalshi often has multiple markets with same title for different candidates)
             const pairKey = `${match.polymarket.question}|||${match.kalshi.question}`;
+            const feedbackKey = getMatchKey(match.polymarket.id, match.kalshi.id);
+            const flagged = feedbackMap[feedbackKey];
 
             if (seenPairs.has(pairKey)) {
                 continue; // Skip duplicate pair
@@ -107,6 +174,8 @@ export async function GET() {
                 kalshi: match.kalshi,
                 similarity: match.similarity,
                 arbitrage,
+                alignmentBreakdown: buildAlignmentBreakdown(match.polymarket, match.kalshi),
+                flagged: flagged?.status === 'mismatch',
             });
         }
 

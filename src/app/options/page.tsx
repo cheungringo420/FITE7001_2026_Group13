@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     OptionData,
     IVComparison,
-    DEFAULT_IV_CONFIG,
 } from '@/lib/options/types';
 import {
     blackScholesCall,
     blackScholesPut,
     probabilityAboveStrike,
-    calculateDiscrepancy,
     calculateGreeks,
-    timeToExpiration,
-    normalCDF,
 } from '@/lib/options/iv-calculator';
+import { useMarketStream } from '@/hooks/useMarketStream';
+import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
+import { TrustSummaryItem } from '@/lib/trust/types';
+import { TrustBadge } from '@/components';
 
 // Mock data for demonstration - In production, this would come from an API
 const MOCK_OPTIONS_DATA: OptionData[] = [
@@ -123,52 +123,6 @@ const MOCK_COMPARISONS: IVComparison[] = [
     },
 ];
 
-// IV Gauge Component
-function IVGauge({ iv, label }: { iv: number; label: string }) {
-    const percentage = Math.min(iv * 100, 100);
-    const color = iv < 0.2 ? 'from-green-500 to-emerald-500'
-        : iv < 0.35 ? 'from-yellow-500 to-orange-500'
-            : 'from-red-500 to-pink-500';
-
-    return (
-        <div className="text-center">
-            <div className="text-xs text-slate-400 mb-1">{label}</div>
-            <div className="relative w-20 h-20 mx-auto">
-                <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                    <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        fill="none"
-                        className="text-slate-700"
-                    />
-                    <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        stroke="url(#ivGradient)"
-                        strokeWidth="8"
-                        fill="none"
-                        strokeDasharray={`${percentage * 2.51} 251`}
-                        className="transition-all duration-500"
-                    />
-                    <defs>
-                        <linearGradient id="ivGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" className={`${color.split(' ')[0].replace('from-', 'stop-')}`} />
-                            <stop offset="100%" className={`${color.split(' ')[1].replace('to-', 'stop-')}`} />
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-bold text-white">{(iv * 100).toFixed(0)}%</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // Probability Comparison Bar
 function ProbabilityBar({
     predictionProb,
@@ -182,16 +136,16 @@ function ProbabilityBar({
     return (
         <div className="space-y-2">
             <div className="flex justify-between text-sm">
-                <span className="text-purple-400">Prediction: {(predictionProb * 100).toFixed(1)}%</span>
-                <span className="text-blue-400">Options: {(optionsProb * 100).toFixed(1)}%</span>
+                <span className="text-brand-300">Prediction: {(predictionProb * 100).toFixed(1)}%</span>
+                <span className="text-accent-cyan">Options: {(optionsProb * 100).toFixed(1)}%</span>
             </div>
             <div className="relative h-2 bg-slate-700 rounded-full overflow-hidden">
                 <div
-                    className="absolute left-0 h-full bg-purple-500/50 transition-all"
+                    className="absolute left-0 h-full bg-brand-500/50 transition-all"
                     style={{ width: `${predictionProb * 100}%` }}
                 />
                 <div
-                    className="absolute left-0 h-full border-r-2 border-blue-400"
+                    className="absolute left-0 h-full border-r-2 border-accent-cyan"
                     style={{ width: `${optionsProb * 100}%` }}
                 />
             </div>
@@ -205,7 +159,7 @@ function ProbabilityBar({
 }
 
 // Comparison Card Component
-function ComparisonCard({ comparison }: { comparison: IVComparison }) {
+function ComparisonCard({ comparison, trust }: { comparison: IVComparison; trust?: TrustSummaryItem }) {
     const [showDetails, setShowDetails] = useState(false);
 
     return (
@@ -220,8 +174,9 @@ function ComparisonCard({ comparison }: { comparison: IVComparison }) {
             <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                        <span className={`w-2 h-2 rounded-full ${comparison.predictionMarket.platform === 'polymarket' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                        <span className={`w-2 h-2 rounded-full ${comparison.predictionMarket.platform === 'polymarket' ? 'bg-brand-500' : 'bg-accent-cyan'}`} />
                         <span className="text-xs text-slate-400 uppercase">{comparison.predictionMarket.platform}</span>
+                        {trust && <TrustBadge score={trust.trustScore} compact />}
                     </div>
                     <h3 className="text-white font-medium line-clamp-2">{comparison.predictionMarket.question}</h3>
                 </div>
@@ -292,7 +247,7 @@ function IVCalculator() {
     const [strike, setStrike] = useState(505);
     const [days, setDays] = useState(30);
     const [iv, setIV] = useState(0.20);
-    const [rate, setRate] = useState(0.045);
+    const rate = 0.045;
 
     const calculations = useMemo(() => {
         const T = days / 365;
@@ -398,9 +353,24 @@ function IVCalculator() {
 
 export default function OptionsPage() {
     const [activeTab, setActiveTab] = useState<'comparisons' | 'calculator' | 'chain'>('comparisons');
+    const { snapshot, isConnected: streamConnected } = useMarketStream();
+    const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
+
+    useEffect(() => {
+        let active = true;
+        fetchTrustSummary({ platform: 'all', limit: 200 }).then((items) => {
+            if (!active) return;
+            if (items.length > 0) {
+                setTrustMap(buildTrustMap(items));
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, []);
 
     return (
-        <div className="min-h-screen bg-slate-950 py-8">
+        <div className="min-h-screen terminal-bg py-8">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="mb-8">
@@ -409,35 +379,41 @@ export default function OptionsPage() {
                             <span className="text-xl">📊</span>
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-white">Options IV Analysis</h1>
+                            <h1 className="text-2xl font-bold text-white text-gradient-brand">Options IV Analysis</h1>
                             <p className="text-slate-400 text-sm">
                                 Compare prediction market probabilities with options-implied volatility
                             </p>
                         </div>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
+                            Stream {streamConnected ? 'Connected' : 'Offline'}
+                        </span>
+                        {snapshot?.updatedAt && (
+                            <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Stats Overview */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400">Active Comparisons</div>
                         <div className="text-2xl font-bold text-white">{MOCK_COMPARISONS.length}</div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400">Opportunities</div>
-                        <div className="text-2xl font-bold text-yellow-400">
-                            {MOCK_COMPARISONS.filter(c => c.discrepancy.opportunity).length}
-                        </div>
+                        <div className="text-2xl font-bold text-yellow-400">{MOCK_COMPARISONS.filter(c => c.discrepancy.opportunity).length}</div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400">Avg IV</div>
                         <div className="text-2xl font-bold text-white">
                             {(MOCK_OPTIONS_DATA.reduce((sum, o) => sum + o.impliedVolatility, 0) / MOCK_OPTIONS_DATA.length * 100).toFixed(1)}%
                         </div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                         <div className="text-sm text-slate-400">Max Discrepancy</div>
-                        <div className="text-2xl font-bold text-green-400">
+                        <div className="text-2xl font-bold text-green-400 neon-text-green">
                             {Math.max(...MOCK_COMPARISONS.map(c => Math.abs(c.discrepancy.percentDiff))).toFixed(1)}%
                         </div>
                     </div>
@@ -450,7 +426,7 @@ export default function OptionsPage() {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab
-                                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
+                                    ? 'bg-brand-500/20 text-brand-300 border border-brand-500/50'
                                     : 'bg-slate-800 text-slate-400 hover:text-white'
                                 }`}
                         >
@@ -466,13 +442,17 @@ export default function OptionsPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-white">Prediction vs Options</h2>
-                            <button className="px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition-colors">
+                            <button className="px-3 py-1.5 bg-brand-500/20 text-brand-300 rounded-lg text-sm hover:bg-brand-500/30 transition-colors">
                                 Refresh Data
                             </button>
                         </div>
                         <div className="grid gap-4 md:grid-cols-2">
                             {MOCK_COMPARISONS.map((comparison) => (
-                                <ComparisonCard key={comparison.id} comparison={comparison} />
+                                <ComparisonCard
+                                    key={comparison.id}
+                                    comparison={comparison}
+                                    trust={trustMap[trustKey(comparison.predictionMarket.platform, comparison.predictionMarket.marketId)]}
+                                />
                             ))}
                         </div>
                         {MOCK_COMPARISONS.length === 0 && (

@@ -30,19 +30,19 @@ export function LiveMarketCard({
     const priceChange = prices?.yes.change;
 
     const platformColor = platform === 'polymarket'
-        ? 'from-purple-500 to-purple-600'
-        : 'from-blue-500 to-blue-600';
+        ? 'from-brand-500 to-brand-600'
+        : 'from-accent-cyan to-accent-cyan';
 
     const platformBg = platform === 'polymarket'
-        ? 'bg-purple-500/10 border-purple-500/20'
-        : 'bg-blue-500/10 border-blue-500/20';
+        ? 'bg-brand-500/10 border-brand-500/20'
+        : 'bg-accent-cyan/10 border-accent-cyan/20';
 
     return (
         <div
             onClick={onClick}
             className={`
                 relative overflow-hidden rounded-xl border border-slate-700/50 
-                bg-slate-800/30 backdrop-blur-sm p-4 
+                bg-slate-800/20 backdrop-blur-sm p-4 
                 hover:border-slate-600/50 transition-all duration-300
                 ${onClick ? 'cursor-pointer hover:scale-[1.02]' : ''}
                 ${className}
@@ -64,7 +64,7 @@ export function LiveMarketCard({
             {/* Platform badge */}
             <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${platformBg} border mb-3`}>
                 <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${platformColor}`} />
-                <span className={platform === 'polymarket' ? 'text-purple-400' : 'text-blue-400'}>
+                <span className={platform === 'polymarket' ? 'text-brand-300' : 'text-accent-cyan'}>
                     {platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
                 </span>
             </div>
@@ -108,7 +108,7 @@ export function LiveMarketCard({
                             yesPrice + 0.005,
                             yesPrice,
                         ]}
-                        color={platform === 'polymarket' ? '#a855f7' : '#3b82f6'}
+                        color={platform === 'polymarket' ? '#17e3c1' : '#4cc9f0'}
                         height={32}
                     />
                 </div>
@@ -187,8 +187,8 @@ export function LiveComparisonCard({
             <div className="grid grid-cols-2 gap-4">
                 {/* Polymarket */}
                 <div className="text-center">
-                    <div className="text-xs text-purple-400 mb-1 flex items-center justify-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    <div className="text-xs text-brand-300 mb-1 flex items-center justify-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-brand-500" />
                         Polymarket
                     </div>
                     <div className={`text-xl font-bold ${polyData.isRecentlyUpdated ? 'text-green-400 animate-pulse' : 'text-white'}`}>
@@ -198,8 +198,8 @@ export function LiveComparisonCard({
 
                 {/* Kalshi */}
                 <div className="text-center">
-                    <div className="text-xs text-blue-400 mb-1 flex items-center justify-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <div className="text-xs text-accent-cyan mb-1 flex items-center justify-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-accent-cyan" />
                         Kalshi
                     </div>
                     <div className={`text-xl font-bold ${kalshiData.isRecentlyUpdated ? 'text-green-400 animate-pulse' : 'text-white'}`}>

@@ -3,15 +3,11 @@
 
 import {
     PolymarketCredentials,
-    CreateOrderParams,
     placeOrder as placePolymarketOrder,
-    OrderResponse as PolymarketOrderResponse
 } from '../polymarket/trading';
 import {
     KalshiCredentials,
-    KalshiOrderParams,
     placeKalshiOrder,
-    KalshiOrderResponse
 } from '../kalshi/trading';
 import { ArbitrageOpportunity } from '../kalshi/types';
 

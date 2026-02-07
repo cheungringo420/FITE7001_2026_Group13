@@ -32,7 +32,7 @@ export function ConnectionStatusIndicator() {
     const { polymarket, kalshi, connect, isFullyConnected, hasAnyConnection } = useWebSocketStatus();
 
     return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 p-1">
             {/* Connection dots */}
             <div className="flex items-center gap-2">
                 <StatusDot status={polymarket} label="Poly" />
@@ -43,8 +43,8 @@ export function ConnectionStatusIndicator() {
             {!hasAnyConnection && (
                 <button
                     onClick={connect}
-                    className="px-2 py-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 
-                             text-purple-400 rounded transition-colors flex items-center gap-1"
+                    className="px-2 py-1 text-xs bg-brand-500/20 hover:bg-brand-500/30 
+                             text-brand-300 rounded transition-colors flex items-center gap-1"
                 >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -56,7 +56,7 @@ export function ConnectionStatusIndicator() {
 
             {/* Live indicator if connected */}
             {isFullyConnected && (
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 rounded-full">
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 rounded-full">
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
@@ -74,7 +74,7 @@ export function ConnectionStatusCompact() {
 
     if (isFullyConnected) {
         return (
-            <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 rounded-full">
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 rounded-full">
                 <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>

@@ -30,9 +30,9 @@ interface PriceContextValue {
     polymarketStatus: ConnectionStatus;
     kalshiStatus: ConnectionStatus;
 
-    // Price data
-    polymarketPrices: Map<string, MarketPrices>;
-    kalshiPrices: Map<string, MarketPrices>;
+    // Price data (refs - stable references, don't trigger re-renders)
+    polymarketPricesRef: React.MutableRefObject<Map<string, MarketPrices>>;
+    kalshiPricesRef: React.MutableRefObject<Map<string, MarketPrices>>;
 
     // Subscriptions
     subscribePolymarket: (marketId: string) => void;
@@ -40,7 +40,7 @@ interface PriceContextValue {
     subscribeKalshi: (ticker: string) => void;
     unsubscribeKalshi: (ticker: string) => void;
 
-    // Get price for a market
+    // Get price for a market (reads from ref)
     getPrice: (platform: 'polymarket' | 'kalshi', marketId: string) => MarketPrices | undefined;
 
     // Connect/disconnect
@@ -49,20 +49,76 @@ interface PriceContextValue {
 
     // Check if price was recently updated (for flash animation)
     wasRecentlyUpdated: (platform: 'polymarket' | 'kalshi', marketId: string) => boolean;
+
+    // Subscribe to price updates for a specific market (returns unsubscribe fn)
+    subscribeToPriceUpdates: (platform: 'polymarket' | 'kalshi', marketId: string, callback: () => void) => () => void;
 }
 
 const PriceContext = createContext<PriceContextValue | null>(null);
 
 const RECENT_UPDATE_THRESHOLD = 2000; // 2 seconds
 
+// Price store for efficient subscriptions - prevents re-render storm
+class PriceStore {
+    private polymarketPrices = new Map<string, MarketPrices>();
+    private kalshiPrices = new Map<string, MarketPrices>();
+    private listeners = new Map<string, Set<() => void>>();
+
+    getPolymarketPrices() {
+        return this.polymarketPrices;
+    }
+
+    getKalshiPrices() {
+        return this.kalshiPrices;
+    }
+
+    getPrice(platform: 'polymarket' | 'kalshi', marketId: string): MarketPrices | undefined {
+        return platform === 'polymarket'
+            ? this.polymarketPrices.get(marketId)
+            : this.kalshiPrices.get(marketId);
+    }
+
+    updatePolymarketPrice(marketId: string, prices: MarketPrices) {
+        this.polymarketPrices.set(marketId, prices);
+        this.notifyListeners(`polymarket:${marketId}`);
+    }
+
+    updateKalshiPrice(ticker: string, prices: MarketPrices) {
+        this.kalshiPrices.set(ticker, prices);
+        this.notifyListeners(`kalshi:${ticker}`);
+    }
+
+    subscribe(platform: 'polymarket' | 'kalshi', marketId: string, callback: () => void): () => void {
+        const key = `${platform}:${marketId}`;
+        if (!this.listeners.has(key)) {
+            this.listeners.set(key, new Set());
+        }
+        this.listeners.get(key)!.add(callback);
+
+        return () => {
+            this.listeners.get(key)?.delete(callback);
+            if (this.listeners.get(key)?.size === 0) {
+                this.listeners.delete(key);
+            }
+        };
+    }
+
+    private notifyListeners(key: string) {
+        this.listeners.get(key)?.forEach(callback => callback());
+    }
+}
+
+// Singleton store instance
+const priceStore = new PriceStore();
+
 export function PriceProvider({ children }: { children: React.ReactNode }) {
-    // Connection status
+    // Connection status (these can trigger re-renders - they change rarely)
     const [polymarketStatus, setPolymarketStatus] = useState<ConnectionStatus>('disconnected');
     const [kalshiStatus, setKalshiStatus] = useState<ConnectionStatus>('disconnected');
 
-    // Price maps
-    const [polymarketPrices, setPolymarketPrices] = useState<Map<string, MarketPrices>>(new Map());
-    const [kalshiPrices, setKalshiPrices] = useState<Map<string, MarketPrices>>(new Map());
+    // Price maps stored as refs (stable references - don't trigger re-renders on update)
+    const polymarketPricesRef = useRef<Map<string, MarketPrices>>(priceStore.getPolymarketPrices());
+    const kalshiPricesRef = useRef<Map<string, MarketPrices>>(priceStore.getKalshiPrices());
 
     // WebSocket instances
     const polyWs = useRef<PolymarketWebSocket | null>(null);
@@ -82,24 +138,21 @@ export function PriceProvider({ children }: { children: React.ReactNode }) {
                     status === 'error' ? 'error' : 'disconnected');
         });
 
+        // Optimized: Update store directly, only subscribed components re-render
         const unsubPolyPrice = polyWs.current.onPriceUpdate((update: PolyPriceUpdate) => {
-            setPolymarketPrices(prev => {
-                const newMap = new Map(prev);
-                const existing = newMap.get(update.marketId);
-                newMap.set(update.marketId, {
-                    yes: {
-                        price: update.price,
-                        change: update.change,
-                        lastUpdate: update.timestamp,
-                    },
-                    no: {
-                        price: 1 - update.price,
-                        change: update.change ? -update.change : undefined,
-                        lastUpdate: update.timestamp,
-                    },
-                });
-                return newMap;
-            });
+            const prices: MarketPrices = {
+                yes: {
+                    price: update.price,
+                    change: update.change,
+                    lastUpdate: update.timestamp,
+                },
+                no: {
+                    price: 1 - update.price,
+                    change: update.change ? -update.change : undefined,
+                    lastUpdate: update.timestamp,
+                },
+            };
+            priceStore.updatePolymarketPrice(update.marketId, prices);
         });
 
         // Set up Kalshi callbacks
@@ -109,23 +162,21 @@ export function PriceProvider({ children }: { children: React.ReactNode }) {
                     status === 'error' ? 'error' : 'disconnected');
         });
 
+        // Optimized: Update store directly, only subscribed components re-render
         const unsubKalshiPrice = kalshiWs.current.onPriceUpdate((update: KalshiPriceUpdate) => {
-            setKalshiPrices(prev => {
-                const newMap = new Map(prev);
-                newMap.set(update.ticker, {
-                    yes: {
-                        price: update.yesPrice,
-                        change: update.yesChange,
-                        lastUpdate: update.timestamp,
-                    },
-                    no: {
-                        price: update.noPrice,
-                        change: update.noChange,
-                        lastUpdate: update.timestamp,
-                    },
-                });
-                return newMap;
-            });
+            const prices: MarketPrices = {
+                yes: {
+                    price: update.yesPrice,
+                    change: update.yesChange,
+                    lastUpdate: update.timestamp,
+                },
+                no: {
+                    price: update.noPrice,
+                    change: update.noChange,
+                    lastUpdate: update.timestamp,
+                },
+            };
+            priceStore.updateKalshiPrice(update.ticker, prices);
         });
 
         return () => {
@@ -165,28 +216,28 @@ export function PriceProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const getPrice = useCallback((platform: 'polymarket' | 'kalshi', marketId: string): MarketPrices | undefined => {
-        if (platform === 'polymarket') {
-            return polymarketPrices.get(marketId);
-        }
-        return kalshiPrices.get(marketId);
-    }, [polymarketPrices, kalshiPrices]);
+        return priceStore.getPrice(platform, marketId);
+    }, []);
 
     const wasRecentlyUpdated = useCallback((platform: 'polymarket' | 'kalshi', marketId: string): boolean => {
-        const prices = platform === 'polymarket'
-            ? polymarketPrices.get(marketId)
-            : kalshiPrices.get(marketId);
-
+        const prices = priceStore.getPrice(platform, marketId);
         if (!prices) return false;
+        return (Date.now() - prices.yes.lastUpdate) < RECENT_UPDATE_THRESHOLD;
+    }, []);
 
-        const now = Date.now();
-        return (now - prices.yes.lastUpdate) < RECENT_UPDATE_THRESHOLD;
-    }, [polymarketPrices, kalshiPrices]);
+    const subscribeToPriceUpdates = useCallback((
+        platform: 'polymarket' | 'kalshi',
+        marketId: string,
+        callback: () => void
+    ): (() => void) => {
+        return priceStore.subscribe(platform, marketId, callback);
+    }, []);
 
     const value: PriceContextValue = {
         polymarketStatus,
         kalshiStatus,
-        polymarketPrices,
-        kalshiPrices,
+        polymarketPricesRef,
+        kalshiPricesRef,
         subscribePolymarket,
         unsubscribePolymarket,
         subscribeKalshi,
@@ -195,6 +246,7 @@ export function PriceProvider({ children }: { children: React.ReactNode }) {
         connect,
         disconnect,
         wasRecentlyUpdated,
+        subscribeToPriceUpdates,
     };
 
     return (
@@ -212,7 +264,6 @@ export function usePrices() {
     return context;
 }
 
-// Hook for subscribing to specific markets
 export function useMarketPrice(platform: 'polymarket' | 'kalshi', marketId: string) {
     const {
         getPrice,
@@ -223,17 +274,31 @@ export function useMarketPrice(platform: 'polymarket' | 'kalshi', marketId: stri
         wasRecentlyUpdated,
         polymarketStatus,
         kalshiStatus,
+        subscribeToPriceUpdates,
     } = usePrices();
+
+    const [, forceUpdate] = useState({});
 
     useEffect(() => {
         if (platform === 'polymarket') {
             subscribePolymarket(marketId);
-            return () => unsubscribePolymarket(marketId);
         } else {
             subscribeKalshi(marketId);
-            return () => unsubscribeKalshi(marketId);
         }
-    }, [platform, marketId, subscribePolymarket, unsubscribePolymarket, subscribeKalshi, unsubscribeKalshi]);
+
+        const unsubscribe = subscribeToPriceUpdates(platform, marketId, () => {
+            forceUpdate({});
+        });
+
+        return () => {
+            unsubscribe();
+            if (platform === 'polymarket') {
+                unsubscribePolymarket(marketId);
+            } else {
+                unsubscribeKalshi(marketId);
+            }
+        };
+    }, [platform, marketId, subscribePolymarket, unsubscribePolymarket, subscribeKalshi, unsubscribeKalshi, subscribeToPriceUpdates]);
 
     const prices = getPrice(platform, marketId);
     const isRecentlyUpdated = wasRecentlyUpdated(platform, marketId);

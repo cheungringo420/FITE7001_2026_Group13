@@ -11,15 +11,16 @@
  */
 
 import { pipeline, env } from '@xenova/transformers';
+import type { FeatureExtractionPipeline, Tensor } from '@xenova/transformers';
 
 // Disable local model storage (use cache)
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 
 // Cache for the pipeline instance
-let embeddingPipeline: any = null;
+let embeddingPipeline: FeatureExtractionPipeline | null = null;
 let isInitializing = false;
-let initializationPromise: Promise<any> | null = null;
+let initializationPromise: Promise<FeatureExtractionPipeline> | null = null;
 
 // In-memory cache for embeddings
 const embeddingCache = new Map<string, number[]>();
@@ -28,7 +29,7 @@ const embeddingCache = new Map<string, number[]>();
  * Initialize the embedding pipeline
  * This downloads the model on first use (~23MB)
  */
-async function initializePipeline() {
+async function initializePipeline(): Promise<FeatureExtractionPipeline> {
     if (embeddingPipeline) return embeddingPipeline;
 
     if (isInitializing && initializationPromise) {
@@ -45,11 +46,11 @@ async function initializePipeline() {
             // Use quantized model for smaller size and faster inference
             quantized: true,
         }
-    ).then((pipeline) => {
-        embeddingPipeline = pipeline;
+    ).then((embeddingPipe) => {
+        embeddingPipeline = embeddingPipe;
         isInitializing = false;
         console.log('[LocalEmbeddings] Model loaded successfully');
-        return pipeline;
+        return embeddingPipe;
     }).catch((error) => {
         isInitializing = false;
         initializationPromise = null;
@@ -100,7 +101,7 @@ export async function getLocalEmbeddings(texts: string[]): Promise<(number[] | n
         const output = await pipe(textsToEmbed, {
             pooling: 'mean',
             normalize: true,
-        });
+        }) as Tensor[];
 
         // Process results
         for (let i = 0; i < textsToEmbed.length; i++) {
@@ -108,7 +109,7 @@ export async function getLocalEmbeddings(texts: string[]): Promise<(number[] | n
             const idx = indices[i];
 
             // Extract embedding array from tensor
-            const embedding = Array.from(output[i].data) as number[];
+            const embedding = Array.from(output[i].data as Float32Array) as number[];
 
             // Cache it
             embeddingCache.set(text, embedding);

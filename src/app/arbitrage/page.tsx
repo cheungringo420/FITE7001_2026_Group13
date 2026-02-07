@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ArbitrageOpportunity } from '@/lib/kalshi/types';
-import { ExecuteArbitrageModal } from '@/components';
+import { ExecuteArbitrageModal, TrustBadge } from '@/components';
+import { useMarketStream } from '@/hooks/useMarketStream';
+import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
+import { TrustSummaryItem } from '@/lib/trust/types';
 
 interface ScanResult {
     opportunities: ArbitrageOpportunity[];
@@ -18,13 +21,17 @@ export default function ArbitragePage() {
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(false);
     const [selectedOpportunity, setSelectedOpportunity] = useState<ArbitrageOpportunity | null>(null);
+    const { snapshot, isConnected: streamConnected } = useMarketStream();
+    const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
+    const [minTrust, setMinTrust] = useState(0);
+    const [strictMode, setStrictMode] = useState(false);
 
     const scanForArbitrage = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch('/api/arbitrage/scan');
+            const response = await fetch(strictMode ? '/api/arbitrage/scan?strict=true' : '/api/arbitrage/scan');
 
             if (!response.ok) {
                 throw new Error('Failed to scan for arbitrage');
@@ -37,11 +44,29 @@ export default function ArbitragePage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [strictMode]);
 
     useEffect(() => {
         scanForArbitrage();
     }, [scanForArbitrage]);
+
+    useEffect(() => {
+        let active = true;
+        fetchTrustSummary({ platform: 'all', limit: 200 }).then((items) => {
+            if (!active) return;
+            if (items.length > 0) {
+                setTrustMap(buildTrustMap(items));
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!snapshot?.updatedAt) return;
+        scanForArbitrage();
+    }, [snapshot?.updatedAt, scanForArbitrage]);
 
     // Auto-refresh every 30 seconds if enabled
     useEffect(() => {
@@ -51,19 +76,39 @@ export default function ArbitragePage() {
         return () => clearInterval(interval);
     }, [autoRefresh, scanForArbitrage]);
 
+    const opportunities = (scanResult?.opportunities || []).filter((opp) => {
+        if (minTrust <= 0) return true;
+        const trust1 = trustMap[trustKey(opp.platform1.name, opp.platform1.marketId)];
+        const trust2 = trustMap[trustKey(opp.platform2.name, opp.platform2.marketId)];
+        if (!trust1) return false;
+        if (opp.type === 'single-platform') {
+            return trust1.trustScore >= minTrust;
+        }
+        return Boolean(trust2 && trust1.trustScore >= minTrust && trust2.trustScore >= minTrust);
+    });
+
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen terminal-bg">
             {/* Hero */}
             <section className="relative overflow-hidden py-16 px-4">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-slate-950 to-emerald-900/20"></div>
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute inset-0 grid-overlay opacity-30" />
+                <div className="absolute top-0 left-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 right-1/3 w-72 h-72 bg-brand-500/10 rounded-full blur-3xl"></div>
 
                 <div className="relative max-w-7xl mx-auto">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                        <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}>
+                        <span className="text-gradient-success">
                             Arbitrage Scanner
                         </span>
                     </h1>
+                    <div className="flex flex-wrap items-center gap-3 mb-6 text-xs text-slate-500">
+                        <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
+                            Stream {streamConnected ? 'Connected' : 'Offline'}
+                        </span>
+                        {snapshot?.updatedAt && (
+                            <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
+                    </div>
                     <p className="text-lg text-slate-400 max-w-2xl mb-8">
                         Real-time scanning across Polymarket and Kalshi for cross-platform arbitrage opportunities.
                         Find markets where Yes + No &lt; $1 for guaranteed profits.
@@ -74,7 +119,7 @@ export default function ArbitragePage() {
                         <button
                             onClick={scanForArbitrage}
                             disabled={isLoading}
-                            className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-brand-500 hover:from-emerald-500 hover:to-brand-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-glow-sm"
                         >
                             {isLoading ? (
                                 <>
@@ -103,6 +148,31 @@ export default function ArbitragePage() {
                             />
                             Auto-refresh (30s)
                         </label>
+
+                        <label className="flex items-center gap-2 text-amber-200 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={strictMode}
+                                onChange={(e) => setStrictMode(e.target.checked)}
+                                className="w-4 h-4 rounded border-amber-400/50 bg-slate-800 text-amber-400 focus:ring-amber-400"
+                            />
+                            Strict matching (resolution aligned)
+                        </label>
+
+                        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-full px-3 py-1">
+                            <span className="text-xs text-slate-500">Min Trust</span>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={minTrust}
+                                onChange={(e) => setMinTrust(Number(e.target.value))}
+                                className="w-24 accent-emerald-400"
+                                aria-label="Minimum trust score"
+                            />
+                            <span className="text-xs text-slate-300">{minTrust}</span>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -111,22 +181,22 @@ export default function ArbitragePage() {
             {scanResult && (
                 <section className="max-w-7xl mx-auto px-4 py-8">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
                             <div className="text-sm text-slate-400 mb-1">Opportunities Found</div>
-                            <div className="text-2xl font-bold text-green-400">{scanResult.opportunities.length}</div>
+                            <div className="text-2xl font-bold text-green-400 neon-text-green">{opportunities.length}</div>
                         </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                            <div className="text-sm text-slate-400 mb-1">Matched Markets</div>
-                            <div className="text-2xl font-bold text-white">{scanResult.matchedMarkets}</div>
-                        </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                            <div className="text-sm text-slate-400 mb-1">Polymarket</div>
-                            <div className="text-2xl font-bold text-purple-400">{scanResult.polymarketCount}</div>
-                        </div>
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                            <div className="text-sm text-slate-400 mb-1">Kalshi</div>
-                            <div className="text-2xl font-bold text-blue-400">{scanResult.kalshiCount}</div>
-                        </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
+                    <div className="text-sm text-slate-400 mb-1">Matched Markets</div>
+                    <div className="text-2xl font-bold text-white">{scanResult.matchedMarkets}</div>
+                </div>
+                <div className="bg-brand-500/10 rounded-xl p-4 border border-brand-500/30 web3-glow">
+                    <div className="text-sm text-brand-300 mb-1">Polymarket</div>
+                    <div className="text-2xl font-bold text-brand-300">{scanResult.polymarketCount}</div>
+                </div>
+                <div className="bg-accent-cyan/10 rounded-xl p-4 border border-accent-cyan/30 web3-glow">
+                    <div className="text-sm text-accent-cyan mb-1">Kalshi</div>
+                    <div className="text-2xl font-bold text-accent-cyan">{scanResult.kalshiCount}</div>
+                </div>
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
                         Last scanned: {new Date(scanResult.scannedAt).toLocaleTimeString()}
@@ -146,7 +216,7 @@ export default function ArbitragePage() {
             {/* Opportunities */}
             <section className="max-w-7xl mx-auto px-4 pb-16">
                 <h2 className="text-2xl font-bold text-white mb-6">
-                    {scanResult?.opportunities.length ? 'Arbitrage Opportunities' : 'No Opportunities Found'}
+                    {opportunities.length ? 'Arbitrage Opportunities' : 'No Opportunities Found'}
                 </h2>
 
                 {isLoading && !scanResult && (
@@ -163,7 +233,7 @@ export default function ArbitragePage() {
                     </div>
                 )}
 
-                {scanResult?.opportunities.length === 0 && !isLoading && (
+                {opportunities.length === 0 && !isLoading && (
                     <div className="bg-slate-800/30 rounded-2xl p-12 text-center border border-slate-700/50">
                         <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,10 +248,14 @@ export default function ArbitragePage() {
                 )}
 
                 <div className="space-y-4">
-                    {scanResult?.opportunities.map((opp) => (
+                    {opportunities.map((opp) => {
+                        const trust1 = trustMap[trustKey(opp.platform1.name, opp.platform1.marketId)];
+                        const trust2 = trustMap[trustKey(opp.platform2.name, opp.platform2.marketId)];
+
+                        return (
                         <div
                             key={opp.id}
-                            className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl p-6 border border-green-500/30 hover:border-green-500/50 transition-colors"
+                            className="web3-card bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl p-6 border border-green-500/30 hover:border-green-500/50 hover:shadow-glow-lg hover:shadow-green-500/20 transition-all duration-300"
                         >
                             {/* Header */}
                             <div className="flex items-start justify-between mb-4">
@@ -193,6 +267,9 @@ export default function ArbitragePage() {
                                             }`}>
                                             {opp.type === 'cross-platform' ? '🔀 CROSS-PLATFORM' : '📍 SINGLE PLATFORM'}
                                         </span>
+                                        {trust1 && (
+                                            <TrustBadge score={trust1.trustScore} compact />
+                                        )}
                                     </div>
                                     <h3 className="text-lg font-semibold text-white">
                                         {opp.question}
@@ -212,10 +289,11 @@ export default function ArbitragePage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div className="bg-slate-800/50 rounded-xl p-4">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform1.name === 'polymarket' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform1.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
                                             }`}>
                                             {opp.platform1.name.toUpperCase()}
                                         </span>
+                                        {trust1 && <TrustBadge score={trust1.trustScore} compact />}
                                         {opp.platform1.url && (
                                             <a
                                                 href={opp.platform1.url}
@@ -249,10 +327,11 @@ export default function ArbitragePage() {
 
                                 <div className="bg-slate-800/50 rounded-xl p-4">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform2.name === 'polymarket' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform2.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
                                             }`}>
                                             {opp.platform2.name.toUpperCase()}
                                         </span>
+                                        {trust2 && <TrustBadge score={trust2.trustScore} compact />}
                                         {opp.platform2.url && (
                                             <a
                                                 href={opp.platform2.url}
@@ -324,7 +403,8 @@ export default function ArbitragePage() {
                                 </button>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </section>
 
@@ -333,8 +413,8 @@ export default function ArbitragePage() {
                 <h2 className="text-2xl font-bold text-white mb-6">How Arbitrage Works</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50">
-                        <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
-                            <span className="text-purple-400 font-bold">1</span>
+                        <div className="w-10 h-10 bg-brand-500/20 rounded-xl flex items-center justify-center mb-4">
+                            <span className="text-brand-300 font-bold">1</span>
                         </div>
                         <h3 className="text-lg font-semibold text-white mb-2">Find Price Discrepancy</h3>
                         <p className="text-slate-400 text-sm">

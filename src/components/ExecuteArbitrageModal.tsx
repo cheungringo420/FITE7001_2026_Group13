@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 import { ArbitrageOpportunity } from '@/lib/kalshi/types';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/lib/arbitrage/execution';
 import { deriveApiCredentials, PolymarketCredentials } from '@/lib/polymarket/trading';
 import { KalshiCredentials } from '@/lib/kalshi/trading';
+import { TrustBadge } from './TrustBadge';
 
 interface ExecuteArbitrageModalProps {
     opportunity: ArbitrageOpportunity;
@@ -34,6 +35,71 @@ export function ExecuteArbitrageModal({
     const [kalshiCredentials, setKalshiCredentials] = useState<KalshiCredentials | null>(null);
     const [kalshiApiKey, setKalshiApiKey] = useState('');
     const [kalshiPrivateKey, setKalshiPrivateKey] = useState('');
+    const [trustLegs, setTrustLegs] = useState<Array<{
+        platform: 'polymarket' | 'kalshi';
+        marketId: string;
+        trustScore: number;
+        disputeRisk: number;
+        resolutionConfidence: number;
+    }>>([]);
+
+    useEffect(() => {
+        let active = true;
+
+        const fetchTrust = async () => {
+            try {
+                const [res1, res2] = await Promise.all([
+                    fetch(`/api/trust/market?platform=${opportunity.platform1.name}&id=${opportunity.platform1.marketId}`),
+                    fetch(`/api/trust/market?platform=${opportunity.platform2.name}&id=${opportunity.platform2.marketId}`),
+                ]);
+
+                const legs: Array<{
+                    platform: 'polymarket' | 'kalshi';
+                    marketId: string;
+                    trustScore: number;
+                    disputeRisk: number;
+                    resolutionConfidence: number;
+                }> = [];
+
+                const pushLeg = (
+                    platform: 'polymarket' | 'kalshi',
+                    marketId: string,
+                    analysis?: { trustScore: number; disputeRisk: number; resolutionConfidence: number }
+                ) => {
+                    if (!analysis) return;
+                    legs.push({
+                        platform,
+                        marketId,
+                        trustScore: analysis.trustScore,
+                        disputeRisk: analysis.disputeRisk,
+                        resolutionConfidence: analysis.resolutionConfidence,
+                    });
+                };
+
+                if (res1.ok) {
+                    const data = await res1.json();
+                    pushLeg(opportunity.platform1.name, opportunity.platform1.marketId, data.analysis);
+                }
+                if (res2.ok) {
+                    const data = await res2.json();
+                    pushLeg(opportunity.platform2.name, opportunity.platform2.marketId, data.analysis);
+                }
+
+                if (active) {
+                    const unique = new Map<string, typeof legs[number]>();
+                    legs.forEach((leg) => unique.set(`${leg.platform}:${leg.marketId}`, leg));
+                    setTrustLegs(Array.from(unique.values()));
+                }
+            } catch {
+                if (active) setTrustLegs([]);
+            }
+        };
+
+        fetchTrust();
+        return () => {
+            active = false;
+        };
+    }, [opportunity]);
 
     if (!isOpen) return null;
 
@@ -136,6 +202,24 @@ export function ExecuteArbitrageModal({
                         <span className="text-slate-400">Expected Profit</span>
                         <span className="text-green-400 font-semibold">+{opportunity.profitPercentage.toFixed(2)}%</span>
                     </div>
+                    {trustLegs.length > 0 && (
+                        <div className="mt-4 space-y-2 text-xs text-slate-400">
+                            <div className="text-slate-500 uppercase tracking-wide">Trust Snapshot</div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {trustLegs.map((leg) => (
+                                    <div key={`${leg.platform}-${leg.marketId}`} className="flex items-center justify-between">
+                                        <span className={leg.platform === 'polymarket' ? 'text-brand-300' : 'text-accent-cyan'}>
+                                            {leg.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <TrustBadge score={leg.trustScore} compact />
+                                            <span className="text-slate-500">Dispute {leg.disputeRisk}%</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Wallet Status */}
@@ -154,13 +238,13 @@ export function ExecuteArbitrageModal({
                         {(opportunity.platform1.name === 'polymarket' || opportunity.platform2.name === 'polymarket') && (
                             <div className="bg-slate-800/30 rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-sm font-medium text-purple-400">Polymarket</span>
+                                    <span className="text-sm font-medium text-brand-300">Polymarket</span>
                                     {polyCredentials ? (
                                         <span className="text-xs text-green-400">✓ Connected</span>
                                     ) : (
                                         <button
                                             onClick={handleDerivePolymarketKey}
-                                            className="text-xs px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors"
+                                            className="text-xs px-3 py-1 bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 rounded-lg transition-colors"
                                         >
                                             Sign to Connect
                                         </button>
@@ -176,7 +260,7 @@ export function ExecuteArbitrageModal({
                         {(opportunity.platform1.name === 'kalshi' || opportunity.platform2.name === 'kalshi') && (
                             <div className="bg-slate-800/30 rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-sm font-medium text-blue-400">Kalshi</span>
+                                    <span className="text-sm font-medium text-accent-cyan">Kalshi</span>
                                     {kalshiCredentials ? (
                                         <span className="text-xs text-green-400">✓ Configured</span>
                                     ) : null}
@@ -200,7 +284,7 @@ export function ExecuteArbitrageModal({
                                         <button
                                             onClick={handleSaveKalshiCredentials}
                                             disabled={!kalshiApiKey || !kalshiPrivateKey}
-                                            className="w-full text-xs px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors disabled:opacity-50"
+                                            className="w-full text-xs px-3 py-2 bg-accent-cyan/20 hover:bg-accent-cyan/30 text-accent-cyan rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             Save Credentials
                                         </button>
@@ -224,7 +308,7 @@ export function ExecuteArbitrageModal({
                         onChange={(e) => setAmount(e.target.value)}
                         min="1"
                         step="1"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg font-mono focus:border-purple-500 focus:outline-none"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg font-mono focus:border-brand-500 focus:outline-none"
                     />
                     <div className="flex justify-between text-sm mt-2">
                         <span className="text-slate-500">Contracts: {contracts}</span>
@@ -236,7 +320,7 @@ export function ExecuteArbitrageModal({
                 {progress && !result && (
                     <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
                         <div className="flex items-center gap-3 mb-3">
-                            <svg className="animate-spin w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin w-5 h-5 text-brand-300" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getCacheClient } from '@/lib/cache';
+import { updatePolymarketSnapshot } from '@/lib/realtime/market-stream';
 
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+const CACHE_TTL_MS = 30_000;
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -25,6 +28,13 @@ export async function GET(request: Request) {
     params.set('enableOrderBook', 'true');
 
     try {
+        const cache = getCacheClient();
+        const cacheKey = `polymarket:markets:${params.toString()}`;
+        const cached = await cache.get<unknown[]>(cacheKey);
+        if (cached) {
+            return NextResponse.json(cached);
+        }
+
         const url = `${GAMMA_API_BASE}/markets?${params.toString()}`;
         const response = await fetch(url, {
             headers: {
@@ -48,6 +58,8 @@ export async function GET(request: Request) {
             );
         }
 
+        await cache.set(cacheKey, markets, CACHE_TTL_MS);
+        updatePolymarketSnapshot(markets);
         return NextResponse.json(markets);
     } catch (error) {
         console.error('Error fetching markets:', error);

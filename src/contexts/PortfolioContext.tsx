@@ -51,25 +51,6 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     const [lastUpdated, setLastUpdated] = useState<number>();
     const [error, setError] = useState<string>();
 
-    // Load from localStorage on mount
-    useEffect(() => {
-        loadFromStorage();
-    }, []);
-
-    // Recalculate stats when positions or trades change
-    useEffect(() => {
-        const newStats = calculatePortfolioStats(positions, trades);
-        setStats(newStats);
-        setLastUpdated(Date.now());
-    }, [positions, trades]);
-
-    // Auto-save on changes
-    useEffect(() => {
-        if (!isLoading && positions.length + trades.length > 0) {
-            saveToStorage();
-        }
-    }, [positions, trades, arbitrageTrades, isLoading]);
-
     const loadFromStorage = useCallback(() => {
         setIsLoading(true);
         try {
@@ -104,6 +85,25 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
             console.error('[Portfolio] Failed to save to storage:', err);
         }
     }, [positions, trades, arbitrageTrades]);
+
+    // Load from localStorage on mount
+    useEffect(() => {
+        loadFromStorage();
+    }, [loadFromStorage]);
+
+    // Recalculate stats when positions or trades change
+    useEffect(() => {
+        const newStats = calculatePortfolioStats(positions, trades);
+        setStats(newStats);
+        setLastUpdated(Date.now());
+    }, [positions, trades]);
+
+    // Auto-save on changes
+    useEffect(() => {
+        if (!isLoading && positions.length + trades.length > 0) {
+            saveToStorage();
+        }
+    }, [positions, trades, arbitrageTrades, isLoading, saveToStorage]);
 
     const clearPortfolio = useCallback(() => {
         setPositions([]);

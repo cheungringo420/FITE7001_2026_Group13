@@ -1,0 +1,65 @@
+[
+  {
+    "id": "ev-crypto-01",
+    "marketKeys": ["category:crypto", "category:bitcoin"],
+    "title": "On-chain activity shows elevated volatility in Bitcoin markets",
+    "summary": "Recent on-chain metrics indicate increased transaction volume and volatility, which may raise uncertainty around near-term price targets.",
+    "publishedAt": "2026-01-15",
+    "sourceId": "coinmetrics",
+    "stance": "neutral"
+  },
+  {
+    "id": "ev-crypto-02",
+    "marketKeys": ["category:crypto", "category:bitcoin"],
+    "title": "Derivative open interest suggests risk of sharp price moves",
+    "summary": "Open interest and funding rate shifts can precede outsized moves, increasing the risk of rapid market repricing.",
+    "publishedAt": "2026-01-10",
+    "sourceId": "cme",
+    "stance": "support"
+  },
+  {
+    "id": "ev-econ-01",
+    "marketKeys": ["category:economy", "category:finance"],
+    "title": "IMF outlook cites persistent inflation risks",
+    "summary": "The latest outlook highlights continued inflation pressure and uncertainty over the timing of rate cuts.",
+    "publishedAt": "2026-01-20",
+    "sourceId": "imf",
+    "stance": "support"
+  },
+  {
+    "id": "ev-econ-02",
+    "marketKeys": ["category:economy", "category:finance"],
+    "title": "CBO baseline projects slower growth under tight policy",
+    "summary": "Budget projections incorporate a slower growth path if rates remain higher for longer, influencing policy expectations.",
+    "publishedAt": "2026-01-08",
+    "sourceId": "cbo",
+    "stance": "neutral"
+  },
+  {
+    "id": "ev-politics-01",
+    "marketKeys": ["category:politics", "category:us-politics"],
+    "title": "Election calendar confirms key dates and certification windows",
+    "summary": "The official election calendar provides resolution guidance and reduces ambiguity around certification timelines.",
+    "publishedAt": "2026-01-05",
+    "sourceId": "cbo",
+    "stance": "support"
+  },
+  {
+    "id": "ev-science-01",
+    "marketKeys": ["category:science", "category:space"],
+    "title": "NASA mission update confirms revised launch window",
+    "summary": "Mission updates outline target windows and official criteria for launch success and mission milestones.",
+    "publishedAt": "2026-01-12",
+    "sourceId": "nasa",
+    "stance": "support"
+  },
+  {
+    "id": "ev-fx-01",
+    "marketKeys": ["category:world", "category:macro"],
+    "title": "IMF notes elevated geopolitical risk premiums",
+    "summary": "Geopolitical risk can widen outcome distributions and raise dispute risk for loosely specified markets.",
+    "publishedAt": "2026-01-18",
+    "sourceId": "imf",
+    "stance": "neutral"
+  }
+]

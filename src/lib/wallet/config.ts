@@ -1,17 +1,50 @@
 'use client';
 
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { createConfig, http } from 'wagmi';
+import { injected } from 'wagmi/connectors';
 import { polygon, mainnet } from 'wagmi/chains';
 
 // WalletConnect Project ID - you should get your own at https://cloud.walletconnect.com
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id';
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const hasWalletConnect = Boolean(projectId && projectId !== 'demo-project-id');
+const chains = [polygon, mainnet] as const;
 
-export const wagmiConfig = getDefaultConfig({
-    appName: 'PM Arbitrage',
-    projectId,
-    chains: [polygon, mainnet],
-    ssr: true,
-});
+const transports = {
+    [polygon.id]: http(),
+    [mainnet.id]: http(),
+};
+
+type WagmiConfig = ReturnType<typeof createConfig>;
+
+declare global {
+    var __wagmiConfig: WagmiConfig | undefined;
+}
+
+const buildWagmiConfig = (): WagmiConfig => {
+    if (hasWalletConnect) {
+        return getDefaultConfig({
+            appName: 'PM Arbitrage',
+            projectId: projectId as string,
+            chains,
+            ssr: true,
+        });
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Wallet] WalletConnect project ID not set. Falling back to injected wallets only.');
+    }
+
+    return createConfig({
+        chains,
+        transports,
+        connectors: [injected()],
+        ssr: true,
+    });
+};
+
+export const wagmiConfig = globalThis.__wagmiConfig ?? (globalThis.__wagmiConfig = buildWagmiConfig());
+export const walletConnectEnabled = hasWalletConnect;
 
 // Polymarket uses Polygon network
 export const POLYMARKET_CHAIN = polygon;
