@@ -7,6 +7,7 @@ import { NormalizedMarket } from '@/lib/kalshi/types';
 import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
 import { TrustSummaryItem } from '@/lib/trust/types';
 import { getCategoryVisual } from '@/lib/market/category';
+import Image from 'next/image';
 
 type PlatformFilter = 'all' | 'polymarket' | 'kalshi';
 type CategoryFilter = string; // 'all' or category name
@@ -42,8 +43,9 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
   const [minTrust, setMinTrust] = useState(0);
-  const [polyLimit, setPolyLimit] = useState(100);
-  const [kalshiLimit, setKalshiLimit] = useState(100);
+  const [polyLimit, setPolyLimit] = useState(50);
+  const [kalshiLimit, setKalshiLimit] = useState(50);
+  const [visibleLimit, setVisibleLimit] = useState(50);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -92,6 +94,10 @@ export default function HomePage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    setVisibleLimit(50);
+  }, [searchQuery, platformFilter, categoryFilter, minTrust]);
+
   // Convert to unified display format
   const allMarkets: DisplayMarket[] = [
     // Polymarket markets
@@ -105,7 +111,7 @@ export default function HomePage() {
       noPrice: m.outcomePrices[1] || 0.5,
       volume24h: m.volume24hr || 0,
       volume: parseFloat(m.volume) || 0,
-      image: m.image,
+      image: m.image || m.icon,
       url: m.events?.[0]?.slug
         ? `https://polymarket.com/event/${m.events[0].slug}`
         : `https://polymarket.com/event/${m.slug}`,
@@ -157,6 +163,8 @@ export default function HomePage() {
     })
     .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
 
+  const visibleMarkets = filteredMarkets.slice(0, visibleLimit);
+
   const topOpportunities = filteredMarkets
     .filter(m => m.active)
     .map(m => {
@@ -190,24 +198,35 @@ export default function HomePage() {
   const kalshiCount = kalshiData.length;
   const hasMorePolymarket = polymarketData.length >= polyLimit;
   const hasMoreKalshi = kalshiData.length >= kalshiLimit;
-  const canLoadMore = platformFilter === 'polymarket'
+  const canFetchMore = platformFilter === 'polymarket'
     ? hasMorePolymarket
     : platformFilter === 'kalshi'
       ? hasMoreKalshi
       : hasMorePolymarket || hasMoreKalshi;
+  const hasHiddenMarkets = filteredMarkets.length > visibleLimit;
+  const canLoadMore = hasHiddenMarkets || canFetchMore;
 
   const handleLoadMore = () => {
+    const nextVisible = visibleLimit + 50;
+    const needsFetch = filteredMarkets.length < nextVisible && canFetchMore;
+
+    setVisibleLimit(nextVisible);
+
+    if (!needsFetch) {
+      return;
+    }
+
     setIsFetchingMore(true);
     if (platformFilter === 'polymarket') {
-      setPolyLimit((prev) => prev + 100);
+      setPolyLimit((prev) => prev + 50);
       return;
     }
     if (platformFilter === 'kalshi') {
-      setKalshiLimit((prev) => prev + 100);
+      setKalshiLimit((prev) => prev + 50);
       return;
     }
-    setPolyLimit((prev) => prev + 50);
-    setKalshiLimit((prev) => prev + 50);
+    setPolyLimit((prev) => prev + 25);
+    setKalshiLimit((prev) => prev + 25);
   };
 
   return (
@@ -273,7 +292,10 @@ export default function HomePage() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-500">
-              <span className="chip">Results {filteredMarkets.length}</span>
+              <span className="chip">
+                Results {visibleMarkets.length}
+                {filteredMarkets.length > visibleMarkets.length ? ` of ${filteredMarkets.length}` : ''}
+              </span>
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
@@ -448,42 +470,43 @@ export default function HomePage() {
               <span className="text-xs text-slate-500">High conviction + liquidity</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {topOpportunities.map((market) => {
-                const { icon, color } = getCategoryVisual(market.category);
-                return (
-                  <div
-                    key={`top-${market.id}`}
-                    className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-4 hover:border-brand-500/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${color} text-[11px] flex items-center justify-center text-white shadow-sm`}>
-                          {icon}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full ${market.platform === 'polymarket'
-                            ? 'bg-brand-500/20 text-brand-300'
-                            : 'bg-accent-cyan/20 text-accent-cyan'
-                          }`}>
-                          {market.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
-                        </span>
-                      </div>
-                      <span className="text-slate-500">Vol {Math.round(market.volume24h || market.volume).toLocaleString()}</span>
+              {topOpportunities.map((market) => (
+                <div
+                  key={`top-${market.id}`}
+                  className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-4 hover:border-brand-500/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <MarketIcon
+                        image={market.image}
+                        category={market.category}
+                        alt={market.question}
+                        className="w-7 h-7"
+                        sizes="28px"
+                      />
+                      <span className={`px-2 py-0.5 rounded-full ${market.platform === 'polymarket'
+                          ? 'bg-brand-500/20 text-brand-300'
+                          : 'bg-accent-cyan/20 text-accent-cyan'
+                        }`}>
+                        {market.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
+                      </span>
                     </div>
-                    {trustMap[trustKey(market.platform, market.id)] && (
-                      <div className="mb-2">
-                        <TrustBadge score={trustMap[trustKey(market.platform, market.id)]!.trustScore} compact />
-                      </div>
-                    )}
-                    <div className="text-sm text-white font-medium line-clamp-2 mb-3">
-                      {market.question}
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-green-400">Yes {(market.yesPrice * 100).toFixed(1)}¢</span>
-                      <span className="text-slate-500">Conviction {(Math.abs(market.yesPrice - 0.5) * 200).toFixed(0)}%</span>
-                    </div>
+                    <span className="text-slate-500">Vol {Math.round(market.volume24h || market.volume).toLocaleString()}</span>
                   </div>
-                );
-              })}
+                  {trustMap[trustKey(market.platform, market.id)] && (
+                    <div className="mb-2">
+                      <TrustBadge score={trustMap[trustKey(market.platform, market.id)]!.trustScore} compact />
+                    </div>
+                  )}
+                  <div className="text-sm text-white font-medium line-clamp-2 mb-3">
+                    {market.question}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-green-400">Yes {(market.yesPrice * 100).toFixed(1)}¢</span>
+                    <span className="text-slate-500">Conviction {(Math.abs(market.yesPrice - 0.5) * 200).toFixed(0)}%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -493,7 +516,7 @@ export default function HomePage() {
             // Loading skeletons
             [...Array(6)].map((_, i) => <MarketCardSkeleton key={i} />)
           ) : filteredMarkets.length > 0 ? (
-            filteredMarkets.map((market) => (
+            visibleMarkets.map((market) => (
               market.platform === 'polymarket' ? (
                 <MarketCard
                   key={market.id}
@@ -593,10 +616,34 @@ export default function HomePage() {
   );
 }
 
+function MarketIcon({ image, category, alt, className, sizes = '32px' }: { image?: string; category?: string; alt?: string; className?: string; sizes?: string }) {
+  const [showImage, setShowImage] = useState(Boolean(image));
+  const { icon, color } = getCategoryVisual(category);
+
+  useEffect(() => {
+    setShowImage(Boolean(image));
+  }, [image]);
+
+  return (
+    <div className={`relative rounded-lg bg-gradient-to-br ${color} border border-slate-700/50 flex items-center justify-center overflow-hidden ${className || ''}`}>
+      {showImage && image ? (
+        <Image
+          src={image}
+          alt={alt || ''}
+          fill
+          sizes={sizes}
+          className="object-cover"
+          onError={() => setShowImage(false)}
+        />
+      ) : (
+        <span className="text-white text-sm">{icon}</span>
+      )}
+    </div>
+  );
+}
+
 // Kalshi Market Card Component
 function KalshiMarketCard({ market, trust }: { market: DisplayMarket; trust?: TrustSummaryItem }) {
-  const { icon, color } = getCategoryVisual(market.category);
-
   const formatVolume = (volume: number) => {
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
     if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`;
@@ -620,10 +667,14 @@ function KalshiMarketCard({ market, trust }: { market: DisplayMarket; trust?: Tr
           )}
         </div>
 
-        {/* Category Icon */}
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} border border-slate-700/50 mb-4 flex items-center justify-center`}>
-          <span className="text-white text-lg">{icon}</span>
-        </div>
+        {/* Category / Market Icon */}
+        <MarketIcon
+          image={market.image}
+          category={market.category}
+          alt={market.question}
+          className="w-12 h-12 mb-4"
+          sizes="48px"
+        />
 
         {/* Trust Snapshot */}
         {trust && (
