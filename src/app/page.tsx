@@ -7,6 +7,7 @@ import { NormalizedMarket } from '@/lib/kalshi/types';
 import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
 import { TrustSummaryItem } from '@/lib/trust/types';
 import { getCategoryVisual } from '@/lib/market/category';
+import { normalizeMarketImageUrl } from '@/lib/market/image';
 import Image from 'next/image';
 
 type PlatformFilter = 'all' | 'polymarket' | 'kalshi';
@@ -43,9 +44,9 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
   const [minTrust, setMinTrust] = useState(0);
-  const [polyLimit, setPolyLimit] = useState(50);
-  const [kalshiLimit, setKalshiLimit] = useState(50);
-  const [visibleLimit, setVisibleLimit] = useState(50);
+  const [polyLimit, setPolyLimit] = useState(20);
+  const [kalshiLimit, setKalshiLimit] = useState(20);
+  const [visibleLimit, setVisibleLimit] = useState(20);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -95,7 +96,7 @@ export default function HomePage() {
   }, [fetchData]);
 
   useEffect(() => {
-    setVisibleLimit(50);
+    setVisibleLimit(20);
   }, [searchQuery, platformFilter, categoryFilter, minTrust]);
 
   // Convert to unified display format
@@ -111,7 +112,7 @@ export default function HomePage() {
       noPrice: m.outcomePrices[1] || 0.5,
       volume24h: m.volume24hr || 0,
       volume: parseFloat(m.volume) || 0,
-      image: m.image || m.icon,
+      image: normalizeMarketImageUrl(m.image || m.icon),
       url: m.events?.[0]?.slug
         ? `https://polymarket.com/event/${m.events[0].slug}`
         : `https://polymarket.com/event/${m.slug}`,
@@ -207,7 +208,7 @@ export default function HomePage() {
   const canLoadMore = hasHiddenMarkets || canFetchMore;
 
   const handleLoadMore = () => {
-    const nextVisible = visibleLimit + 50;
+    const nextVisible = visibleLimit + 20;
     const needsFetch = filteredMarkets.length < nextVisible && canFetchMore;
 
     setVisibleLimit(nextVisible);
@@ -218,15 +219,15 @@ export default function HomePage() {
 
     setIsFetchingMore(true);
     if (platformFilter === 'polymarket') {
-      setPolyLimit((prev) => prev + 50);
+      setPolyLimit((prev) => prev + 20);
       return;
     }
     if (platformFilter === 'kalshi') {
-      setKalshiLimit((prev) => prev + 50);
+      setKalshiLimit((prev) => prev + 20);
       return;
     }
-    setPolyLimit((prev) => prev + 25);
-    setKalshiLimit((prev) => prev + 25);
+    setPolyLimit((prev) => prev + 10);
+    setKalshiLimit((prev) => prev + 10);
   };
 
   return (
@@ -312,6 +313,71 @@ export default function HomePage() {
 
       {/* Markets Grid */}
       <section className="max-w-7xl mx-auto px-4 pb-16">
+        {/* Theme Bar - Horizontal Scroll */}
+        {(isLoading || sortedCategories.length > 0) && (
+          <div className="mb-6 -mx-4 px-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-slate-500">Market Themes</span>
+              {hasHiddenCategories && (
+                <button
+                  onClick={() => setShowAllCategories((prev) => !prev)}
+                  className="text-xs text-brand-300 hover:text-brand-200"
+                >
+                  {showAllCategories ? 'Show Less' : `Show All (${sortedCategories.length})`}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`flex-shrink-0 chip ${categoryFilter === 'all'
+                    ? 'chip-active'
+                    : 'hover:text-white'
+                  }`}
+              >
+                All Markets
+              </button>
+              {sortedCategories.length === 0 ? (
+                [...Array(6)].map((_, index) => (
+                  <div
+                    key={`theme-skeleton-${index}`}
+                    className="flex-shrink-0 chip bg-slate-800/50 border-slate-700/50 text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-full bg-slate-700/60" />
+                    <span className="w-16 h-3 bg-slate-700/60 rounded" />
+                  </div>
+                ))
+              ) : (
+                visibleCategories.map((cat) => {
+                  const { icon, color } = getCategoryVisual(cat);
+                  const isActive = categoryFilter === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`flex-shrink-0 chip ${isActive
+                          ? 'chip-active'
+                          : 'hover:text-white'
+                        }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${color} text-[11px] flex items-center justify-center text-white shadow-sm`}>
+                        {icon}
+                      </span>
+                      <span className="truncate max-w-[10rem]">{cat}</span>
+                      <span className="text-[10px] text-slate-500">{categoryCounts[cat]}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            {!isLoading && sortedCategories.length === 0 && (
+              <div className="mt-2 text-xs text-slate-600">
+                No themes available yet. This usually means markets failed to load.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Header with Filter */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="text-2xl font-bold text-white">
@@ -383,54 +449,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
-        {/* Theme Bar - Horizontal Scroll */}
-        {sortedCategories.length > 0 && (
-          <div className="mb-8 -mx-4 px-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase tracking-[0.2em] text-slate-500">Themes</span>
-              {hasHiddenCategories && (
-                <button
-                  onClick={() => setShowAllCategories((prev) => !prev)}
-                  className="text-xs text-brand-300 hover:text-brand-200"
-                >
-                  {showAllCategories ? 'Show Less' : `Show All (${sortedCategories.length})`}
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <button
-                onClick={() => setCategoryFilter('all')}
-                className={`flex-shrink-0 chip ${categoryFilter === 'all'
-                    ? 'chip-active'
-                    : 'hover:text-white'
-                  }`}
-              >
-                All Markets
-              </button>
-              {visibleCategories.map((cat) => {
-                const { icon, color } = getCategoryVisual(cat);
-                const isActive = categoryFilter === cat;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoryFilter(cat)}
-                    className={`flex-shrink-0 chip ${isActive
-                        ? 'chip-active'
-                        : 'hover:text-white'
-                      }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${color} text-[11px] flex items-center justify-center text-white shadow-sm`}>
-                      {icon}
-                    </span>
-                    <span className="truncate max-w-[10rem]">{cat}</span>
-                    <span className="text-[10px] text-slate-500">{categoryCounts[cat]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Info Banner - Collapsible/Minimal */}
         <div className="mb-6 flex items-center gap-2 text-xs text-slate-500">

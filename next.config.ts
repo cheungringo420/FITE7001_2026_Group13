@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'polymarket.com' },
+      { protocol: 'https', hostname: 'www.polymarket.com' },
+      { protocol: 'https', hostname: 'static.polymarket.com' },
+      { protocol: 'https', hostname: 'cdn.polymarket.com' },
       { protocol: 'https', hostname: 'gamma-api.polymarket.com' },
       { protocol: 'https', hostname: 'clob.polymarket.com' },
       { protocol: 'https', hostname: 'ipfs.io' },

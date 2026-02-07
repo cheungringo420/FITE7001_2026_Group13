@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ParsedMarket } from '@/lib/polymarket/types';
 import { TrustSummaryItem } from '@/lib/trust/types';
 import { getCategoryVisual } from '@/lib/market/category';
+import { normalizeMarketImageUrl } from '@/lib/market/image';
 import { TrustBadge } from './TrustBadge';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -19,7 +20,7 @@ export function MarketCard({ market, trust }: MarketCardProps) {
     const externalUrl = market.events?.[0]?.slug || market.slug
         ? `https://polymarket.com/event/${market.events?.[0]?.slug || market.slug}`
         : undefined;
-    const marketImage = market.image || market.icon;
+    const marketImage = normalizeMarketImageUrl(market.image || market.icon);
     const [showImage, setShowImage] = useState(Boolean(marketImage));
     const { icon, color } = getCategoryVisual(market.category);
 
