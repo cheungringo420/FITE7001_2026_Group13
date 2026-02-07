@@ -98,10 +98,30 @@ export async function getLocalEmbeddings(texts: string[]): Promise<(number[] | n
         console.log(`[LocalEmbeddings] Generating ${textsToEmbed.length} embeddings (${embeddingCache.size} cached)`);
 
         // Generate embeddings for non-cached texts
-        const output = await pipe(textsToEmbed, {
+        const rawOutput = await pipe(textsToEmbed, {
             pooling: 'mean',
             normalize: true,
-        }) as Tensor[];
+        });
+
+        let embeddings: number[][] = [];
+
+        if (Array.isArray(rawOutput)) {
+            embeddings = rawOutput.map((tensor) => Array.from(tensor.data as Float32Array) as number[]);
+        } else {
+            const tensor = rawOutput as Tensor;
+            const data = Array.from(tensor.data as Float32Array) as number[];
+            const dims = (tensor.dims ?? []) as number[];
+
+            if (dims.length >= 2) {
+                const batch = dims[0];
+                const stride = Math.floor(data.length / Math.max(batch, 1));
+                for (let i = 0; i < batch; i++) {
+                    embeddings.push(data.slice(i * stride, (i + 1) * stride));
+                }
+            } else {
+                embeddings = [data];
+            }
+        }
 
         // Process results
         for (let i = 0; i < textsToEmbed.length; i++) {
@@ -109,7 +129,11 @@ export async function getLocalEmbeddings(texts: string[]): Promise<(number[] | n
             const idx = indices[i];
 
             // Extract embedding array from tensor
-            const embedding = Array.from(output[i].data as Float32Array) as number[];
+            const embedding = embeddings[i] ?? null;
+            if (!embedding) {
+                results[idx] = null;
+                continue;
+            }
 
             // Cache it
             embeddingCache.set(text, embedding);

@@ -1,27 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IBM_Plex_Sans, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { WalletProvider, WalletButton, PriceProvider, ConnectionStatusIndicator, ErrorBoundary } from "@/components";
 import { PortfolioProvider } from "@/contexts/PortfolioContext";
-
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
 
 export const metadata: Metadata = {
   title: "Prediction Market Arbitrage | Real-time Orderbook",
@@ -37,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${plexSans.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased text-white min-h-screen`}
+        className="antialiased text-white min-h-screen"
         style={{ fontFamily: 'var(--font-ibm-plex-sans), sans-serif' }}
       >
         <WalletProvider>

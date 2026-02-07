@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  turbopack: {}, // Allow webpack config
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'polymarket.com' },
@@ -26,6 +26,15 @@ const nextConfig: NextConfig = {
         'onnxruntime-node': 'commonjs onnxruntime-node',
       });
     }
+
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      '@react-native-async-storage/async-storage': path.resolve(
+        __dirname,
+        'src/lib/wallet/asyncStorageStub'
+      ),
+    };
 
     // Set async WebAssembly for transformers
     config.experiments = {

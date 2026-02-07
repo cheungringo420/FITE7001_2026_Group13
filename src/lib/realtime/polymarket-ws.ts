@@ -254,7 +254,7 @@ export class PolymarketWebSocket {
 
     private handleEventMessage(message: { event_type: string;[key: string]: unknown }): void {
         // Emit raw event for legacy consumers
-        this.eventCallbacks.forEach(cb => cb(message as import('../polymarket/types').WebSocketEvent));
+        this.eventCallbacks.forEach(cb => cb(message as unknown as import('../polymarket/types').WebSocketEvent));
 
         const marketId = (message.asset_id as string) || (message.market as string);
 

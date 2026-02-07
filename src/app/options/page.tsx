@@ -10,6 +10,7 @@ import {
     blackScholesPut,
     probabilityAboveStrike,
     calculateGreeks,
+    timeToExpiration,
 } from '@/lib/options/iv-calculator';
 import { useMarketStream } from '@/hooks/useMarketStream';
 import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
@@ -66,7 +67,36 @@ const MOCK_OPTIONS_DATA: OptionData[] = [
         underlyingPrice: 415.20,
         daysToExpiration: 22,
     },
+    {
+        symbol: 'QQQ240119P420',
+        underlying: 'QQQ',
+        strikePrice: 420,
+        expirationDate: '2026-02-19',
+        optionType: 'put',
+        lastPrice: 10.20,
+        bid: 10.00,
+        ask: 10.40,
+        volume: 7600,
+        openInterest: 21000,
+        impliedVolatility: 0.23,
+        delta: -0.48,
+        underlyingPrice: 415.20,
+        daysToExpiration: 22,
+    },
 ];
+
+const RISK_FREE_RATE = 0.045;
+
+function getOptionLegs(comparison: IVComparison): { call?: OptionData; put?: OptionData } {
+    const keyMatch = (option: OptionData) =>
+        option.underlying === comparison.optionsData.underlying &&
+        option.strikePrice === comparison.optionsData.strikePrice &&
+        option.expirationDate === comparison.optionsData.expirationDate;
+
+    const call = MOCK_OPTIONS_DATA.find((option) => keyMatch(option) && option.optionType === 'call');
+    const put = MOCK_OPTIONS_DATA.find((option) => keyMatch(option) && option.optionType === 'put');
+    return { call, put };
+}
 
 const MOCK_COMPARISONS: IVComparison[] = [
     {
@@ -161,6 +191,49 @@ function ProbabilityBar({
 // Comparison Card Component
 function ComparisonCard({ comparison, trust }: { comparison: IVComparison; trust?: TrustSummaryItem }) {
     const [showDetails, setShowDetails] = useState(false);
+    const { call, put } = getOptionLegs(comparison);
+    const alignmentDate = comparison.predictionMarket.expiry;
+    const optionExpiry = comparison.optionsData.expirationDate;
+    const alignmentDeltaDays = alignmentDate
+        ? Math.round((new Date(optionExpiry).getTime() - new Date(alignmentDate).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+    const isAligned = alignmentDeltaDays === 0;
+    const hasAlignment = alignmentDeltaDays !== null && !Number.isNaN(alignmentDeltaDays);
+
+    const minVolume = Math.min(call?.volume ?? Infinity, put?.volume ?? Infinity);
+    const minOpenInterest = Math.min(call?.openInterest ?? Infinity, put?.openInterest ?? Infinity);
+    const avgSpread = call && put ? ((call.ask - call.bid) + (put.ask - put.bid)) / 2 : null;
+    const liquidityStatus = !call || !put
+        ? 'unknown'
+        : minVolume < 2000 || minOpenInterest < 8000
+            ? 'thin'
+            : minVolume < 5000 || minOpenInterest < 15000 || (avgSpread ?? 0) > 0.8
+                ? 'caution'
+                : 'healthy';
+
+    const underlyingPrice = call?.underlyingPrice ?? put?.underlyingPrice ?? comparison.optionsData.strikePrice;
+    const T = timeToExpiration(optionExpiry);
+    const greeks = T > 0
+        ? calculateGreeks(
+            {
+                S: underlyingPrice,
+                K: comparison.optionsData.strikePrice,
+                T,
+                r: RISK_FREE_RATE,
+                sigma: comparison.optionsData.impliedVolatility,
+            },
+            true
+        )
+        : null;
+    const riskLabel = greeks
+        ? greeks.gamma > 0.02
+            ? 'High gamma'
+            : greeks.vega > 0.15
+                ? 'Vol sensitive'
+                : Math.abs(greeks.delta) > 0.6
+                    ? 'Directional'
+                    : 'Balanced'
+        : 'Unknown';
 
     return (
         <div className={`bg-slate-800/50 rounded-xl border ${comparison.discrepancy.opportunity ? 'border-yellow-500/50' : 'border-slate-700'} p-4`}>
@@ -190,6 +263,42 @@ function ComparisonCard({ comparison, trust }: { comparison: IVComparison; trust
                 predictionProb={comparison.predictionMarket.yesPrice}
                 optionsProb={comparison.optionsData.impliedProbability}
             />
+
+            <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+                <span className={`px-2 py-1 rounded-full border ${hasAlignment
+                        ? isAligned
+                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                            : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                        : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
+                    }`}>
+                    {hasAlignment
+                        ? isAligned
+                            ? 'Expiry aligned'
+                            : `Expiry Δ ${alignmentDeltaDays > 0 ? '+' : ''}${alignmentDeltaDays}d`
+                        : 'Expiry unknown'}
+                </span>
+                <span className={`px-2 py-1 rounded-full border ${liquidityStatus === 'healthy'
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : liquidityStatus === 'caution'
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            : liquidityStatus === 'thin'
+                                ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                                : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
+                    }`}>
+                    {liquidityStatus === 'healthy'
+                        ? 'Liquidity: Healthy'
+                        : liquidityStatus === 'caution'
+                            ? 'Liquidity: Caution'
+                            : liquidityStatus === 'thin'
+                                ? 'Liquidity: Thin'
+                                : 'Liquidity: Unknown'}
+                </span>
+                {greeks && (
+                    <span className="px-2 py-1 rounded-full border border-slate-600/40 bg-slate-700/40 text-slate-300">
+                        Risk: {riskLabel}
+                    </span>
+                )}
+            </div>
 
             <div className="grid grid-cols-3 gap-4 mt-4">
                 <div className="text-center">
@@ -227,7 +336,41 @@ function ComparisonCard({ comparison, trust }: { comparison: IVComparison; trust
                             <span className="text-slate-400">Underlying:</span>
                             <span className="text-white ml-2">{comparison.optionsData.underlying}</span>
                         </div>
+                        <div>
+                            <span className="text-slate-400">Underlying Px:</span>
+                            <span className="text-white ml-2">${underlyingPrice.toFixed(2)}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-400">Liquidity:</span>
+                            <span className="text-white ml-2">
+                                {call && put ? `Vol ${minVolume.toLocaleString()} • OI ${minOpenInterest.toLocaleString()}` : 'Unavailable'}
+                            </span>
+                        </div>
                     </div>
+                    {greeks && (
+                        <div className="grid grid-cols-5 gap-2 text-xs">
+                            <div className="bg-slate-900/50 rounded p-2 text-center">
+                                <div className="text-slate-400">Delta</div>
+                                <div className="text-white font-mono">{greeks.delta.toFixed(3)}</div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded p-2 text-center">
+                                <div className="text-slate-400">Gamma</div>
+                                <div className="text-white font-mono">{greeks.gamma.toFixed(4)}</div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded p-2 text-center">
+                                <div className="text-slate-400">Theta</div>
+                                <div className="text-white font-mono">{greeks.theta.toFixed(3)}</div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded p-2 text-center">
+                                <div className="text-slate-400">Vega</div>
+                                <div className="text-white font-mono">{greeks.vega.toFixed(3)}</div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded p-2 text-center">
+                                <div className="text-slate-400">Rho</div>
+                                <div className="text-white font-mono">{greeks.rho.toFixed(3)}</div>
+                            </div>
+                        </div>
+                    )}
                     <div className="text-xs text-slate-500">
                         {comparison.discrepancy.direction === 'prediction-higher'
                             ? '📈 Prediction market prices this outcome higher than options imply. Consider buying puts or selling the prediction.'

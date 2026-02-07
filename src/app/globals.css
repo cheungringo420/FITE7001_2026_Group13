@@ -19,6 +19,10 @@
   --danger: #ef476f;
 
   /* Typography */
+  --font-ibm-plex-sans: "IBM Plex Sans", "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-space-grotesk: "Space Grotesk", "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-jetbrains-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --font-display: var(--font-space-grotesk);
   --font-body: var(--font-ibm-plex-sans);
   --font-mono: var(--font-jetbrains-mono);

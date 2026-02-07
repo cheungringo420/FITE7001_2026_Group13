@@ -37,7 +37,7 @@ export function useArbitrageAgent(agentUrl: string, agentId: string = 'default-a
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const connect = useCallback(function connectImpl() {
         try {
