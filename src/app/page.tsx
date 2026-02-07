@@ -6,33 +6,10 @@ import { Market, parseMarket, ParsedMarket } from '@/lib/polymarket';
 import { NormalizedMarket } from '@/lib/kalshi/types';
 import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
 import { TrustSummaryItem } from '@/lib/trust/types';
+import { getCategoryVisual } from '@/lib/market/category';
 
 type PlatformFilter = 'all' | 'polymarket' | 'kalshi';
 type CategoryFilter = string; // 'all' or category name
-
-// Define category icons and colors
-const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
-  'Crypto': { icon: '₿', color: 'from-orange-500 to-yellow-500' },
-  'Bitcoin': { icon: '₿', color: 'from-orange-500 to-yellow-500' },
-  'Politics': { icon: '🏛️', color: 'from-blue-500 to-indigo-500' },
-  'US Politics': { icon: '🇺🇸', color: 'from-blue-500 to-red-500' },
-  'Sports': { icon: '⚽', color: 'from-green-500 to-emerald-500' },
-  'NBA': { icon: '🏀', color: 'from-orange-500 to-red-500' },
-  'NFL': { icon: '🏈', color: 'from-green-600 to-yellow-600' },
-  'Soccer': { icon: '⚽', color: 'from-green-500 to-emerald-500' },
-  'Pop Culture': { icon: '🎬', color: 'from-pink-500 to-purple-500' },
-  'Entertainment': { icon: '🎭', color: 'from-pink-500 to-purple-500' },
-  'Science': { icon: '🔬', color: 'from-cyan-500 to-blue-500' },
-  'Tech': { icon: '💻', color: 'from-violet-500 to-purple-500' },
-  'AI': { icon: '🤖', color: 'from-violet-500 to-purple-500' },
-  'Economy': { icon: '📈', color: 'from-emerald-500 to-teal-500' },
-  'Finance': { icon: '💰', color: 'from-emerald-500 to-teal-500' },
-  'World': { icon: '🌍', color: 'from-blue-500 to-cyan-500' },
-  'Weather': { icon: '🌤️', color: 'from-sky-500 to-blue-500' },
-  'Climate': { icon: '🌡️', color: 'from-red-500 to-orange-500' },
-  'Elections': { icon: '🗳️', color: 'from-purple-500 to-pink-500' },
-  'default': { icon: '📊', color: 'from-slate-500 to-slate-600' },
-};
 
 // Combined market type for display
 interface DisplayMarket {
@@ -57,6 +34,7 @@ export default function HomePage() {
   const [polymarketData, setPolymarketData] = useState<ParsedMarket[]>([]);
   const [kalshiData, setKalshiData] = useState<NormalizedMarket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,19 +42,27 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
   const [minTrust, setMinTrust] = useState(0);
+  const [polyLimit, setPolyLimit] = useState(100);
+  const [kalshiLimit, setKalshiLimit] = useState(100);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   const fetchData = useCallback(async () => {
+    const isInitialLoad = polymarketData.length === 0 && kalshiData.length === 0;
+
     try {
-      setIsLoading(true);
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
       setError(null);
 
+      const trustLimit = Math.max(200, Math.min(400, polyLimit + kalshiLimit));
+
       // Fetch from both platforms + trust summary in parallel
-      // No limits - show all available markets
-       const [polyRes, kalshiRes, trustItems] = await Promise.all([
-         fetch('/api/markets?limit=100&order=volume24hr&ascending=false'),
-         fetch('/api/kalshi/markets?limit=100'),
-         fetchTrustSummary({ platform: 'all', limit: 200 }),
-       ]);
+      const [polyRes, kalshiRes, trustItems] = await Promise.all([
+        fetch(`/api/markets?limit=${polyLimit}&order=volume24hr&ascending=false`),
+        fetch(`/api/kalshi/markets?limit=${kalshiLimit}`),
+        fetchTrustSummary({ platform: 'all', limit: trustLimit }),
+      ]);
 
       if (polyRes.ok) {
         const polyData: Market[] = await polyRes.json();
@@ -98,8 +84,9 @@ export default function HomePage() {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
+      setIsFetchingMore(false);
     }
-  }, []);
+  }, [kalshiLimit, kalshiData.length, polyLimit, polymarketData.length]);
 
   useEffect(() => {
     fetchData();
@@ -184,17 +171,44 @@ export default function HomePage() {
     .sort((a, b) => b.opportunityScore - a.opportunityScore)
     .slice(0, 6);
 
-  // Derive unique categories from all markets
-  const allCategories = Array.from(
-    new Set(
-      allMarkets
-        .map(m => m.category)
-        .filter((c): c is string => !!c && c.trim() !== '')
-    )
-  ).sort();
+  // Derive category counts for theme bar
+  const categoryCounts = allMarkets.reduce<Record<string, number>>((acc, market) => {
+    const category = market.category?.trim();
+    if (!category) return acc;
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {});
+
+  const sortedCategories = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([category]) => category);
+
+  const visibleCategories = showAllCategories ? sortedCategories : sortedCategories.slice(0, 12);
+  const hasHiddenCategories = sortedCategories.length > visibleCategories.length;
 
   const polyCount = polymarketData.length;
   const kalshiCount = kalshiData.length;
+  const hasMorePolymarket = polymarketData.length >= polyLimit;
+  const hasMoreKalshi = kalshiData.length >= kalshiLimit;
+  const canLoadMore = platformFilter === 'polymarket'
+    ? hasMorePolymarket
+    : platformFilter === 'kalshi'
+      ? hasMoreKalshi
+      : hasMorePolymarket || hasMoreKalshi;
+
+  const handleLoadMore = () => {
+    setIsFetchingMore(true);
+    if (platformFilter === 'polymarket') {
+      setPolyLimit((prev) => prev + 100);
+      return;
+    }
+    if (platformFilter === 'kalshi') {
+      setKalshiLimit((prev) => prev + 100);
+      return;
+    }
+    setPolyLimit((prev) => prev + 50);
+    setKalshiLimit((prev) => prev + 50);
+  };
 
   return (
     <div className="min-h-screen terminal-bg">
@@ -348,9 +362,20 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Category Filter - Horizontal Scroll */}
-        {allCategories.length > 0 && (
+        {/* Theme Bar - Horizontal Scroll */}
+        {sortedCategories.length > 0 && (
           <div className="mb-8 -mx-4 px-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-slate-500">Themes</span>
+              {hasHiddenCategories && (
+                <button
+                  onClick={() => setShowAllCategories((prev) => !prev)}
+                  className="text-xs text-brand-300 hover:text-brand-200"
+                >
+                  {showAllCategories ? 'Show Less' : `Show All (${sortedCategories.length})`}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <button
                 onClick={() => setCategoryFilter('all')}
@@ -361,8 +386,8 @@ export default function HomePage() {
               >
                 All Markets
               </button>
-              {allCategories.slice(0, 10).map((cat) => {
-                const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['default'];
+              {visibleCategories.map((cat) => {
+                const { icon, color } = getCategoryVisual(cat);
                 const isActive = categoryFilter === cat;
                 return (
                   <button
@@ -373,8 +398,11 @@ export default function HomePage() {
                         : 'hover:text-white'
                       }`}
                   >
-                    <span>{config.icon}</span>
-                    {cat}
+                    <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${color} text-[11px] flex items-center justify-center text-white shadow-sm`}>
+                      {icon}
+                    </span>
+                    <span className="truncate max-w-[10rem]">{cat}</span>
+                    <span className="text-[10px] text-slate-500">{categoryCounts[cat]}</span>
                   </button>
                 );
               })}
@@ -420,34 +448,42 @@ export default function HomePage() {
               <span className="text-xs text-slate-500">High conviction + liquidity</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {topOpportunities.map((market) => (
-                <div
-                  key={`top-${market.id}`}
-                  className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-4 hover:border-brand-500/40 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-2 text-xs">
-                    <span className={`px-2 py-0.5 rounded-full ${market.platform === 'polymarket'
-                        ? 'bg-brand-500/20 text-brand-300'
-                        : 'bg-accent-cyan/20 text-accent-cyan'
-                      }`}>
-                      {market.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
-                    </span>
-                    <span className="text-slate-500">Vol {Math.round(market.volume24h || market.volume).toLocaleString()}</span>
-                  </div>
-                  {trustMap[trustKey(market.platform, market.id)] && (
-                    <div className="mb-2">
-                      <TrustBadge score={trustMap[trustKey(market.platform, market.id)]!.trustScore} compact />
+              {topOpportunities.map((market) => {
+                const { icon, color } = getCategoryVisual(market.category);
+                return (
+                  <div
+                    key={`top-${market.id}`}
+                    className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-4 hover:border-brand-500/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${color} text-[11px] flex items-center justify-center text-white shadow-sm`}>
+                          {icon}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full ${market.platform === 'polymarket'
+                            ? 'bg-brand-500/20 text-brand-300'
+                            : 'bg-accent-cyan/20 text-accent-cyan'
+                          }`}>
+                          {market.platform === 'polymarket' ? 'Polymarket' : 'Kalshi'}
+                        </span>
+                      </div>
+                      <span className="text-slate-500">Vol {Math.round(market.volume24h || market.volume).toLocaleString()}</span>
                     </div>
-                  )}
-                  <div className="text-sm text-white font-medium line-clamp-2 mb-3">
-                    {market.question}
+                    {trustMap[trustKey(market.platform, market.id)] && (
+                      <div className="mb-2">
+                        <TrustBadge score={trustMap[trustKey(market.platform, market.id)]!.trustScore} compact />
+                      </div>
+                    )}
+                    <div className="text-sm text-white font-medium line-clamp-2 mb-3">
+                      {market.question}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-green-400">Yes {(market.yesPrice * 100).toFixed(1)}¢</span>
+                      <span className="text-slate-500">Conviction {(Math.abs(market.yesPrice - 0.5) * 200).toFixed(0)}%</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-green-400">Yes {(market.yesPrice * 100).toFixed(1)}¢</span>
-                    <span className="text-slate-500">Conviction {(Math.abs(market.yesPrice - 0.5) * 200).toFixed(0)}%</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -478,6 +514,21 @@ export default function HomePage() {
             </div>
           )}
         </div>
+
+        {!isLoading && canLoadMore && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={isFetchingMore}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${isFetchingMore
+                  ? 'bg-slate-800/60 text-slate-400 border-slate-700/50'
+                  : 'bg-gradient-to-r from-brand-500/20 to-accent-cyan/20 text-white border-brand-500/40 hover:border-brand-500/70 hover:shadow-glow-sm'
+                }`}
+            >
+              {isFetchingMore ? 'Loading more markets…' : 'Load more markets'}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Platform Features */}
@@ -544,6 +595,8 @@ export default function HomePage() {
 
 // Kalshi Market Card Component
 function KalshiMarketCard({ market, trust }: { market: DisplayMarket; trust?: TrustSummaryItem }) {
+  const { icon, color } = getCategoryVisual(market.category);
+
   const formatVolume = (volume: number) => {
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
     if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`;
@@ -567,9 +620,9 @@ function KalshiMarketCard({ market, trust }: { market: DisplayMarket; trust?: Tr
           )}
         </div>
 
-        {/* Placeholder for image alignment */}
-        <div className="w-12 h-12 rounded-xl bg-accent-cyan/10 border border-accent-cyan/20 mb-4 flex items-center justify-center">
-          <span className="text-accent-cyan text-lg font-bold">K</span>
+        {/* Category Icon */}
+        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} border border-slate-700/50 mb-4 flex items-center justify-center`}>
+          <span className="text-white text-lg">{icon}</span>
         </div>
 
         {/* Trust Snapshot */}
