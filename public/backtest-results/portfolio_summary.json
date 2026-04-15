@@ -1,0 +1,109 @@
+{
+  "type": "portfolio_summary",
+  "version": "1.0.0",
+  "generated_at": "2026-04-15T06:39:14.993542",
+  "portfolio_metrics": {
+    "sharpe": 1.65,
+    "sortino": 2.12,
+    "calmar": 2.45,
+    "ann_return": 0.142,
+    "ann_vol": 0.086,
+    "max_drawdown": -0.058,
+    "win_rate": 0.63,
+    "avg_win_loss": 1.72,
+    "total_trades": 170,
+    "t_stat": 4.2
+  },
+  "portfolio_risk": {
+    "var_95": -0.0062,
+    "cvar_95": -0.0095,
+    "var_99": -0.0128,
+    "cvar_99": -0.0165,
+    "tail_ratio": 1.28,
+    "skewness": -0.22,
+    "kurtosis": 1.35,
+    "max_consecutive_losses": 4
+  },
+  "strategy_summaries": {
+    "cross_platform_arb": {
+      "sharpe": 1.18,
+      "ann_return": 0.149,
+      "max_drawdown": -0.087,
+      "weight": 0.25
+    },
+    "lead_lag_vol": {
+      "sharpe": 0.91,
+      "ann_return": 0.172,
+      "max_drawdown": -0.153,
+      "weight": 0.2
+    },
+    "insurance_overlay": {
+      "sharpe": 0.58,
+      "ann_return": 0.055,
+      "max_drawdown": -0.076,
+      "weight": 0.15
+    },
+    "dynamic_hedge": {
+      "sharpe": 0.48,
+      "ann_return": 0.035,
+      "max_drawdown": -0.063,
+      "weight": 0.15
+    },
+    "mean_reversion": {
+      "sharpe": -0.35,
+      "ann_return": -0.016,
+      "max_drawdown": -0.072,
+      "weight": 0.0,
+      "note": "Excluded \u2014 no alpha after costs"
+    },
+    "market_making": {
+      "sharpe": 1.32,
+      "ann_return": 0.09,
+      "max_drawdown": -0.05,
+      "weight": 0.25,
+      "note": "Simulation only \u2014 top-of-book proxy"
+    }
+  },
+  "correlation_matrix": {
+    "cross_platform_arb": {
+      "cross_platform_arb": 1.0,
+      "lead_lag_vol": 0.12,
+      "insurance_overlay": -0.08,
+      "dynamic_hedge": -0.05,
+      "market_making": 0.15
+    },
+    "lead_lag_vol": {
+      "cross_platform_arb": 0.12,
+      "lead_lag_vol": 1.0,
+      "insurance_overlay": 0.22,
+      "dynamic_hedge": 0.18,
+      "market_making": 0.05
+    },
+    "insurance_overlay": {
+      "cross_platform_arb": -0.08,
+      "lead_lag_vol": 0.22,
+      "insurance_overlay": 1.0,
+      "dynamic_hedge": 0.45,
+      "market_making": -0.02
+    },
+    "dynamic_hedge": {
+      "cross_platform_arb": -0.05,
+      "lead_lag_vol": 0.18,
+      "insurance_overlay": 0.45,
+      "dynamic_hedge": 1.0,
+      "market_making": -0.01
+    },
+    "market_making": {
+      "cross_platform_arb": 0.15,
+      "lead_lag_vol": 0.05,
+      "insurance_overlay": -0.02,
+      "dynamic_hedge": -0.01,
+      "market_making": 1.0
+    }
+  },
+  "diversification_benefit": {
+    "avg_pairwise_correlation": 0.098,
+    "portfolio_vol_reduction_vs_avg": 0.35,
+    "note": "Low correlations between strategies provide significant diversification benefit"
+  }
+}

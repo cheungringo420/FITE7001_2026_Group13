@@ -224,6 +224,10 @@ export default function TrustCenterPage() {
           <p className="text-slate-400 mt-2 max-w-2xl">
             Audit market clarity, evidence consensus, and dispute risk before committing capital.
           </p>
+          <a href="/learn#trust-scoring" className="inline-flex items-center gap-1.5 mt-2 text-xs text-brand-300 hover:text-brand-200 transition-colors">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            How is trust score calculated? →
+          </a>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400">
             <label className="flex items-center gap-2">
               <input

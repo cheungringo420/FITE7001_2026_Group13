@@ -1,0 +1,11 @@
+pandas>=2.0
+numpy>=1.24
+yfinance>=0.2.30
+requests>=2.31
+scipy>=1.11
+statsmodels>=0.14
+PyYAML>=6.0
+tqdm>=4.65
+matplotlib>=3.7
+seaborn>=0.12
+jupyter>=1.0

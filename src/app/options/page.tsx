@@ -538,6 +538,19 @@ export default function OptionsPage() {
                     </div>
                 </div>
 
+                {/* Mock Data Banner */}
+                <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                    <span className="text-amber-400 text-lg shrink-0">⚠</span>
+                    <div>
+                        <h3 className="text-sm font-semibold text-amber-300 mb-1">Educational Demo — Mock Data</h3>
+                        <p className="text-xs text-amber-200/70">
+                            Options data shown is simulated for demonstration purposes. The Black-Scholes calculator is fully functional
+                            and can be used for educational exploration. In production, this would connect to a live options data feed
+                            to compare prediction market-implied probabilities with options-implied volatility in real time.
+                        </p>
+                    </div>
+                </div>
+
                 {/* Stats Overview */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">

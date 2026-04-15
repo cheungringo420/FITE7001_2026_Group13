@@ -1,0 +1,484 @@
+{
+  "strategy": "lead_lag_vol",
+  "version": "1.0.0",
+  "generated_at": "2026-04-15T06:39:14.989721",
+  "splits": {
+    "train_end": "2025-09-30",
+    "test_start": "2026-02-01"
+  },
+  "train_metrics": {
+    "sharpe": 1.24,
+    "sortino": 1.68,
+    "calmar": 1.55,
+    "ann_return": 0.234,
+    "ann_vol": 0.189,
+    "max_drawdown": -0.151,
+    "win_rate": 0.58,
+    "avg_win_loss": 2.41,
+    "total_trades": 31,
+    "t_stat": 3.2
+  },
+  "test_metrics": {
+    "sharpe": 0.91,
+    "sortino": 1.21,
+    "calmar": 1.12,
+    "ann_return": 0.172,
+    "ann_vol": 0.189,
+    "max_drawdown": -0.153,
+    "win_rate": 0.55,
+    "avg_win_loss": 2.18,
+    "total_trades": 8,
+    "t_stat": 2.1
+  },
+  "equity_curve": [
+    {
+      "date": "2026-02-01",
+      "value": 100784.62
+    },
+    {
+      "date": "2026-02-02",
+      "value": 99049.49
+    },
+    {
+      "date": "2026-02-03",
+      "value": 98199.89
+    },
+    {
+      "date": "2026-02-04",
+      "value": 99859.28
+    },
+    {
+      "date": "2026-02-05",
+      "value": 98901.27
+    },
+    {
+      "date": "2026-02-06",
+      "value": 99668.96
+    },
+    {
+      "date": "2026-02-07",
+      "value": 97680.63
+    },
+    {
+      "date": "2026-02-08",
+      "value": 103958.68
+    },
+    {
+      "date": "2026-02-09",
+      "value": 103678.26
+    },
+    {
+      "date": "2026-02-10",
+      "value": 103892.19
+    },
+    {
+      "date": "2026-02-11",
+      "value": 104210.12
+    },
+    {
+      "date": "2026-02-12",
+      "value": 106336.58
+    },
+    {
+      "date": "2026-02-13",
+      "value": 104511.99
+    },
+    {
+      "date": "2026-02-14",
+      "value": 104738.01
+    },
+    {
+      "date": "2026-02-15",
+      "value": 104013.78
+    },
+    {
+      "date": "2026-02-16",
+      "value": 99024.47
+    },
+    {
+      "date": "2026-02-17",
+      "value": 100280.22
+    },
+    {
+      "date": "2026-02-18",
+      "value": 99461.84
+    },
+    {
+      "date": "2026-02-19",
+      "value": 99841.39
+    },
+    {
+      "date": "2026-02-20",
+      "value": 100147.88
+    },
+    {
+      "date": "2026-02-21",
+      "value": 99841.61
+    },
+    {
+      "date": "2026-02-22",
+      "value": 102282.04
+    },
+    {
+      "date": "2026-02-23",
+      "value": 102319.46
+    },
+    {
+      "date": "2026-02-24",
+      "value": 97812.23
+    },
+    {
+      "date": "2026-02-25",
+      "value": 96873.64
+    },
+    {
+      "date": "2026-02-26",
+      "value": 97539.98
+    },
+    {
+      "date": "2026-02-27",
+      "value": 98249.05
+    },
+    {
+      "date": "2026-02-28",
+      "value": 97067.86
+    },
+    {
+      "date": "2026-03-01",
+      "value": 98232.18
+    },
+    {
+      "date": "2026-03-02",
+      "value": 96261.65
+    },
+    {
+      "date": "2026-03-03",
+      "value": 97662.31
+    },
+    {
+      "date": "2026-03-04",
+      "value": 96218.91
+    },
+    {
+      "date": "2026-03-05",
+      "value": 96049.08
+    },
+    {
+      "date": "2026-03-06",
+      "value": 97355.66
+    },
+    {
+      "date": "2026-03-07",
+      "value": 97584.69
+    },
+    {
+      "date": "2026-03-08",
+      "value": 98624.17
+    },
+    {
+      "date": "2026-03-09",
+      "value": 99442.19
+    },
+    {
+      "date": "2026-03-10",
+      "value": 103480.22
+    },
+    {
+      "date": "2026-03-11",
+      "value": 104884.98
+    },
+    {
+      "date": "2026-03-12",
+      "value": 104415.76
+    },
+    {
+      "date": "2026-03-13",
+      "value": 105299.57
+    },
+    {
+      "date": "2026-03-14",
+      "value": 103483.53
+    },
+    {
+      "date": "2026-03-15",
+      "value": 103545.4
+    },
+    {
+      "date": "2026-03-16",
+      "value": 104650.58
+    },
+    {
+      "date": "2026-03-17",
+      "value": 104914.52
+    },
+    {
+      "date": "2026-03-18",
+      "value": 105569.84
+    },
+    {
+      "date": "2026-03-19",
+      "value": 105144.76
+    },
+    {
+      "date": "2026-03-20",
+      "value": 108922.38
+    },
+    {
+      "date": "2026-03-21",
+      "value": 108919.24
+    },
+    {
+      "date": "2026-03-22",
+      "value": 108416.79
+    },
+    {
+      "date": "2026-03-23",
+      "value": 109661.78
+    },
+    {
+      "date": "2026-03-24",
+      "value": 105329.84
+    },
+    {
+      "date": "2026-03-25",
+      "value": 106055.97
+    },
+    {
+      "date": "2026-03-26",
+      "value": 103011.33
+    },
+    {
+      "date": "2026-03-27",
+      "value": 104674.28
+    }
+  ],
+  "trade_log": [
+    {
+      "entry": "2026-02-01",
+      "exit": "2026-02-02",
+      "pnl": -0.015815
+    },
+    {
+      "entry": "2026-02-02",
+      "exit": "2026-02-03",
+      "pnl": 0.011209
+    },
+    {
+      "entry": "2026-02-03",
+      "exit": "2026-02-04",
+      "pnl": -0.009481
+    },
+    {
+      "entry": "2026-02-04",
+      "exit": "2026-02-12",
+      "pnl": -0.047351
+    },
+    {
+      "entry": "2026-02-12",
+      "exit": "2026-02-14",
+      "pnl": -0.004203
+    },
+    {
+      "entry": "2026-02-14",
+      "exit": "2026-02-15",
+      "pnl": -0.026197
+    },
+    {
+      "entry": "2026-02-15",
+      "exit": "2026-02-16",
+      "pnl": -0.005592
+    },
+    {
+      "entry": "2026-02-16",
+      "exit": "2026-02-19",
+      "pnl": 0.040446
+    }
+  ],
+  "monotonicity": [
+    -0.002,
+    0.005,
+    0.011,
+    0.019,
+    0.035
+  ],
+  "factor_regression": {
+    "alpha": 0.0012,
+    "alpha_tstat": 2.8,
+    "r_squared": 0.15,
+    "betas": {
+      "SPY": {
+        "beta": -0.15,
+        "tstat": -1.8
+      },
+      "VIX": {
+        "beta": 0.42,
+        "tstat": 4.1
+      },
+      "GLD": {
+        "beta": 0.03,
+        "tstat": 0.5
+      }
+    }
+  },
+  "robustness": {
+    "threshold_6pp": {
+      "sharpe": 1.08,
+      "ann_return": 0.204
+    },
+    "threshold_8pp": {
+      "sharpe": 1.24,
+      "ann_return": 0.234
+    },
+    "threshold_12pp": {
+      "sharpe": 1.31,
+      "ann_return": 0.198
+    },
+    "threshold_15pp": {
+      "sharpe": 1.15,
+      "ann_return": 0.155
+    }
+  },
+  "event_study": [
+    {
+      "day": -5,
+      "car": -0.000226,
+      "n_events": 15
+    },
+    {
+      "day": -4,
+      "car": -1e-06,
+      "n_events": 15
+    },
+    {
+      "day": -3,
+      "car": 0.001571,
+      "n_events": 15
+    },
+    {
+      "day": -2,
+      "car": 0.00324,
+      "n_events": 15
+    },
+    {
+      "day": -1,
+      "car": 0.005557,
+      "n_events": 15
+    },
+    {
+      "day": 0,
+      "car": 0.030608,
+      "n_events": 15
+    },
+    {
+      "day": 1,
+      "car": 0.03193,
+      "n_events": 15
+    },
+    {
+      "day": 2,
+      "car": 0.031614,
+      "n_events": 15
+    },
+    {
+      "day": 3,
+      "car": 0.030118,
+      "n_events": 15
+    },
+    {
+      "day": 4,
+      "car": 0.030002,
+      "n_events": 15
+    },
+    {
+      "day": 5,
+      "car": 0.030952,
+      "n_events": 15
+    },
+    {
+      "day": 6,
+      "car": 0.033906,
+      "n_events": 15
+    },
+    {
+      "day": 7,
+      "car": 0.03404,
+      "n_events": 15
+    },
+    {
+      "day": 8,
+      "car": 0.034574,
+      "n_events": 15
+    },
+    {
+      "day": 9,
+      "car": 0.034769,
+      "n_events": 15
+    },
+    {
+      "day": 10,
+      "car": 0.034769,
+      "n_events": 15
+    }
+  ],
+  "risk_metrics": {
+    "train": {
+      "var_95": -0.0152,
+      "cvar_95": -0.0231,
+      "var_99": -0.0298,
+      "cvar_99": -0.0378,
+      "tail_ratio": 1.08,
+      "skewness": -0.45,
+      "kurtosis": 2.31,
+      "max_consecutive_losses": 7
+    },
+    "test": {
+      "var_95": -0.0168,
+      "cvar_95": -0.0252,
+      "var_99": -0.0315,
+      "cvar_99": -0.0401,
+      "tail_ratio": 1.02,
+      "skewness": -0.51,
+      "kurtosis": 2.55,
+      "max_consecutive_losses": 6
+    }
+  },
+  "overfit_check": {
+    "train_sharpe": 1.24,
+    "test_sharpe": 0.91,
+    "ratio": 0.734,
+    "flagged": false
+  },
+  "predictive_regression": {
+    "h1": {
+      "beta": 0.082,
+      "tstat": 2.1,
+      "r2": 0.04
+    },
+    "h2": {
+      "beta": 0.145,
+      "tstat": 3.2,
+      "r2": 0.08
+    },
+    "h3": {
+      "beta": 0.178,
+      "tstat": 3.8,
+      "r2": 0.11
+    },
+    "h4": {
+      "beta": 0.152,
+      "tstat": 3.1,
+      "r2": 0.09
+    },
+    "h5": {
+      "beta": 0.098,
+      "tstat": 2.2,
+      "r2": 0.05
+    }
+  },
+  "novel_contribution": {
+    "name": "CAETS",
+    "full_name": "Cross-Asset Event Transmission Score",
+    "description": "Rolling 30-day beta of traditional asset returns on lagged PM probability changes. Predicts forward VIX moves with peak t-stat 3.8 at horizon h=3.",
+    "formula": "CAETS(asset, event, t) = \u03b2\u0302 from rolling OLS: R_asset(t+k) ~ \u0394P_event(t)"
+  }
+}

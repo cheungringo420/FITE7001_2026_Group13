@@ -1,0 +1,76 @@
+# PM Arbitrage Backtesting Configuration
+# FITE7001 Group 13 — Phase 2
+
+splits:
+  train_end:      "2025-09-30"   # In-sample: parameter fitting only
+  validation_end: "2026-01-31"   # Validation: threshold tuning only
+  test_start:     "2026-02-01"   # Out-of-sample: NEVER TOUCHED until final run
+
+risk:
+  max_position_pct:   0.10    # 10% of capital per position
+  max_drawdown_stop:  0.15    # Stop strategy at 15% portfolio drawdown
+  kelly_fraction:     0.25    # Quarter-Kelly (standard safety margin)
+  max_notional_usd:   10000   # Per prediction market trade
+  initial_capital:    100000  # Starting capital
+
+costs:
+  polymarket:
+    spread_bps: 100         # 1% conservative
+    commission: 0.0
+    slippage_pct: 0.001     # 0.1% * sqrt(order/daily_vol)
+    gas_per_tx: 0.03        # ~$0.03 per transaction
+  kalshi:
+    spread_bps: 150         # 1.5%
+    commission: 0.0
+    slippage_pct: 0.001
+  vix_options:
+    spread_bps: 50
+    commission_per_contract: 0.65
+    slippage_pct: 0.0
+  equity_etfs:
+    spread_bps: 5
+    commission: 0.0
+    slippage_pct: 0.0
+  short_selling:
+    borrow_cost_bps_yr: 80  # Dreschler & Dreschler 2013
+
+data:
+  min_volume_usd: 10000     # Exclude markets with total volume < $10K
+  price_inversion_upper: 1.05
+  price_inversion_lower: 0.90
+  max_gap_hours: 24
+  polymarket_gamma_url: "https://gamma-api.polymarket.com/markets"
+  polymarket_clob_url: "https://clob.polymarket.com"
+  kalshi_base_url: "https://api.elections.kalshi.com/trade-api/v2"
+
+tickers:
+  - "^VIX"
+  - "SPY"
+  - "GLD"
+  - "USO"
+  - "TLT"
+  - "UUP"
+
+strategies:
+  cross_platform_arb:
+    min_alignment_score: 0.65
+    min_trust_score: 60
+    min_profit_threshold: 0.01  # 1% net of costs
+  lead_lag_vol:
+    delta_p_threshold: 0.08     # 8pp minimum
+    holding_period_range: [1, 5]
+    rolling_window: 90
+    newey_west_lag: 5
+  insurance_overlay:
+    min_trust_score: 70
+    min_liquidity_usd: 50000
+  dynamic_hedge:
+    base_ratio: 0.10
+    p_high: 0.5
+    p_low: 0.2
+  mean_reversion:
+    overpriced_threshold: 1.02
+    timeout_hours: 24
+  market_making:
+    model: "avellaneda_stoikov"
+    note: "simulation only — top-of-book proxy"
