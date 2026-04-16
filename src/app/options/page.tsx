@@ -498,19 +498,27 @@ export default function OptionsPage() {
     const [activeTab, setActiveTab] = useState<'comparisons' | 'calculator' | 'chain'>('comparisons');
     const { snapshot, isConnected: streamConnected } = useMarketStream();
     const [trustMap, setTrustMap] = useState<Record<string, TrustSummaryItem>>({});
+    const [trustRefreshing, setTrustRefreshing] = useState(false);
+
+    const loadTrust = async () => {
+        const items = await fetchTrustSummary({ platform: 'all', limit: 200 });
+        if (items.length > 0) setTrustMap(buildTrustMap(items));
+    };
 
     useEffect(() => {
         let active = true;
         fetchTrustSummary({ platform: 'all', limit: 200 }).then((items) => {
             if (!active) return;
-            if (items.length > 0) {
-                setTrustMap(buildTrustMap(items));
-            }
+            if (items.length > 0) setTrustMap(buildTrustMap(items));
         });
-        return () => {
-            active = false;
-        };
+        return () => { active = false; };
     }, []);
+
+    const handleRefresh = async () => {
+        setTrustRefreshing(true);
+        await loadTrust();
+        setTrustRefreshing(false);
+    };
 
     return (
         <div className="min-h-screen terminal-bg py-8">
@@ -598,8 +606,15 @@ export default function OptionsPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-white">Prediction vs Options</h2>
-                            <button className="px-3 py-1.5 bg-brand-500/20 text-brand-300 rounded-lg text-sm hover:bg-brand-500/30 transition-colors">
-                                Refresh Data
+                            <button
+                                onClick={handleRefresh}
+                                disabled={trustRefreshing}
+                                className="px-3 py-1.5 bg-brand-500/20 text-brand-300 rounded-lg text-sm hover:bg-brand-500/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                                <svg className={`w-3.5 h-3.5 ${trustRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                {trustRefreshing ? 'Refreshing…' : 'Refresh Trust'}
                             </button>
                         </div>
                         <div className="grid gap-4 md:grid-cols-2">

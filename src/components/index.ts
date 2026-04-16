@@ -1,4 +1,5 @@
 export { ErrorBoundary } from './ErrorBoundary';
+export { NavBar } from './NavBar';
 export * from './ui';
 export { OrderBook } from './OrderBook';
 export { MarketCard, MarketCardSkeleton } from './MarketCard';

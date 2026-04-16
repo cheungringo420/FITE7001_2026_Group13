@@ -371,12 +371,18 @@ export default function LearnPage() {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {sections.map(section => (
-              <div key={section.id} className={activeSection === section.id ? '' : 'hidden'}>
-                <h2 className="text-2xl font-bold text-white mb-6">{section.icon} {section.title}</h2>
-                {section.content}
-              </div>
-            ))}
+            {sections
+              .filter(section => section.id === activeSection)
+              .map(section => (
+                <div key={section.id} className="stagger-fadein" style={{ animationDuration: '0.25s' }}>
+                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span>{section.icon}</span>
+                    <span>{section.title}</span>
+                  </h2>
+                  {section.content}
+                </div>
+              ))
+            }
           </div>
         </div>
       </div>

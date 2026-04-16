@@ -95,6 +95,16 @@ const STRENGTH_CONFIG: Record<string, { label: string; color: string }> = {
   weak: { label: 'Weak', color: 'text-slate-400 bg-slate-500/10' },
 };
 
+function relativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 export default function SignalsPage() {
   const [signals, setSignals] = useState<SignalEntry[]>([]);
   const [filter, setFilter] = useState<string>('all');
@@ -119,8 +129,10 @@ export default function SignalsPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-accent-cyan/5 via-transparent to-transparent" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-green-400 font-medium">Live Signal Feed</span>
+            <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-sm text-amber-400 font-medium" style={{ fontFamily: 'var(--font-jetbrains-mono)' }}>
+              MODEL SIGNALS — SIMULATED DATA
+            </span>
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">Strategy Signals</h1>
           <p className="text-lg text-slate-400 max-w-2xl">
@@ -162,6 +174,16 @@ export default function SignalsPage() {
               </div>
             ))}
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-slate-800/60 border border-slate-700/40 flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-slate-400 text-sm font-medium mb-1">No signals for this filter</p>
+            <p className="text-slate-600 text-xs">Try selecting a different strategy type above</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {filtered.map(signal => {
@@ -178,8 +200,8 @@ export default function SignalsPage() {
                         {strengthCfg.label}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500">
-                      {new Date(signal.timestamp).toLocaleTimeString()}
+                    <span className="text-xs text-slate-500 font-mono" title={new Date(signal.timestamp).toLocaleString()}>
+                      {relativeTime(signal.timestamp)}
                     </span>
                   </div>
 

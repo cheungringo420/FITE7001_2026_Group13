@@ -446,6 +446,16 @@ export default function BotDashboard() {
                         </div>
 
                         {/* Recent Opportunities */}
+                        {state.recentOpportunities.length === 0 && state.status === 'running' && (
+                            <div className="mt-6 bg-slate-800/40 rounded-xl border border-slate-700/30 glass px-6 py-10 flex flex-col items-center text-center">
+                                <svg className="w-8 h-8 text-slate-600 mb-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <p className="text-slate-400 text-sm font-medium">Scanning markets…</p>
+                                <p className="text-slate-600 text-xs mt-1">Opportunities will appear here when detected</p>
+                            </div>
+                        )}
                         {state.recentOpportunities.length > 0 && (
                             <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700/50 glass">
                                 <div className="px-6 py-4 border-b border-slate-700/50">
