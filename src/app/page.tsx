@@ -171,10 +171,15 @@ export default function HomePage() {
     .map(m => {
       const volumeBase = m.volume24h || m.volume || 0;
       const conviction = Math.min(Math.abs(m.yesPrice - 0.5) * 2, 1);
-      const volumeScore = Math.log10(volumeBase + 10);
+      const volumeScore = Math.log10(volumeBase + 10) / Math.log10(1e7); // normalise to ~0–1
+      const trust = trustMap[trustKey(m.platform, m.id)];
+      const trustFactor = trust ? trust.trustScore / 100 : 0.5;
+      // RAAS-style composite: conviction × trust × liquidity signal
+      const raasScore = conviction * trustFactor * volumeScore;
       return {
         ...m,
-        opportunityScore: conviction * volumeScore,
+        raasScore,
+        opportunityScore: raasScore,
       };
     })
     .sort((a, b) => b.opportunityScore - a.opportunityScore)
@@ -484,8 +489,8 @@ export default function HomePage() {
         {topOpportunities.length > 0 && (
           <div className="mb-10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Top Opportunities</h3>
-              <span className="text-xs text-slate-500">High conviction + liquidity</span>
+              <h3 className="text-lg font-semibold text-white">Top RAAS-Scored Opportunities</h3>
+              <span className="text-xs text-slate-500">Ranked by conviction × trust × liquidity</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {topOpportunities.map((market) => (
@@ -522,6 +527,10 @@ export default function HomePage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-green-400">Yes {(market.yesPrice * 100).toFixed(1)}¢</span>
                     <span className="text-slate-500">Conviction {(Math.abs(market.yesPrice - 0.5) * 200).toFixed(0)}%</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">RAAS Score</span>
+                    <span className="font-mono font-semibold text-brand-300">{(market.raasScore * 100).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
