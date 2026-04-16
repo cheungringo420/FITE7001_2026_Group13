@@ -84,6 +84,16 @@ const KEY_TOPICS = [
     'doge',
 ];
 
+const QUESTION_INTENTS: Record<string, string[]> = {
+    price: ['price', 'cost', 'worth', 'valuation', 'market cap', 'marketcap', 'fdv', 'revenue', 'earnings', 'profit', 'loss', '$', 'usd', 'dollars', 'cents', 'how much'],
+    release: ['release', 'launch', 'ship', 'debut', 'premiere', 'available', 'rollout'],
+    election: ['election', 'vote', 'president', 'prime minister', 'governor', 'senate', 'congress', 'mayor', 'chancellor'],
+    appointment: ['nominate', 'appoint', 'confirm', 'resign', 'step down', 'be the next', 'successor'],
+    sports: ['champion', 'playoffs', 'score', 'goals', 'touchdown', 'match', 'nba', 'nfl', 'nhl', 'world cup', 'series', 'final'],
+    macro: ['fed', 'interest rate', 'bps', 'basis points', 'inflation', 'gdp', 'recession', 'unemployment', 'cpi', 'pce'],
+    conflict: ['war', 'strike', 'attack', 'invade', 'ceasefire', 'missile'],
+};
+
 const COUNTRIES = [
     'china', 'taiwan', 'israel', 'iran', 'netherlands', 'ukraine', 'russia',
     'united states', 'us', 'canada', 'mexico', 'uk', 'england', 'scotland',
@@ -167,6 +177,19 @@ function extractCountries(text: string): Set<string> {
         }
     }
     return found;
+}
+
+function extractQuestionIntents(text: string): Set<string> {
+    const lowerText = text.toLowerCase();
+    const intents = new Set<string>();
+
+    for (const [intent, keywords] of Object.entries(QUESTION_INTENTS)) {
+        if (keywords.some((keyword) => lowerText.includes(keyword))) {
+            intents.add(intent);
+        }
+    }
+
+    return intents;
 }
 
 function extractProperNames(text: string): Set<string> {
@@ -356,6 +379,16 @@ export function calculateSimilarity(question1: string, question2: string): numbe
         // Still allow but with penalty
         if (criticalIntersection.length < Math.min(critical1.size, critical2.size)) {
             // Partial match - may be related but not same market
+        }
+    }
+
+    // === INTENT VALIDATION ===
+    const intents1 = extractQuestionIntents(question1);
+    const intents2 = extractQuestionIntents(question2);
+    if (intents1.size > 0 && intents2.size > 0) {
+        const intentIntersection = [...intents1].filter((intent) => intents2.has(intent));
+        if (intentIntersection.length === 0) {
+            return 0.05; // Different intent (e.g., price vs release)
         }
     }
 
@@ -566,6 +599,16 @@ function calculateValidationScore(question1: string, question2: string): number 
         }
     } else if ((critical1.size > 0 && critical2.size === 0) || (critical2.size > 0 && critical1.size === 0)) {
         score = Math.min(score, 0.35);
+    }
+
+    // === INTENT VALIDATION ===
+    const intents1 = extractQuestionIntents(question1);
+    const intents2 = extractQuestionIntents(question2);
+    if (intents1.size > 0 && intents2.size > 0) {
+        const intentIntersection = [...intents1].filter((intent) => intents2.has(intent));
+        if (intentIntersection.length === 0) {
+            score = Math.min(score, 0.1);
+        }
     }
 
     // === COUNTRY VALIDATION ===

@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server';
-import { updateExecution, getExecution } from '@/lib/execution/store';
+import { cancelExecution } from '@/lib/execution/service';
 
 export async function POST(
   _: Request,
   { params }: { params: Promise<{ executionId: string }> }
 ) {
-  const { executionId } = await params;
-  const existing = getExecution(executionId);
-  if (!existing) {
-    return NextResponse.json({ error: 'Execution not found' }, { status: 404 });
+  try {
+    const { executionId } = await params;
+    const updated = cancelExecution(executionId);
+    return NextResponse.json({ status: updated.status, executionId: updated.executionId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to cancel execution';
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
-
-  const updated = updateExecution(executionId, { status: 'cancelled' });
-  if (!updated) {
-    return NextResponse.json({ error: 'Unable to cancel execution' }, { status: 400 });
-  }
-
-  return NextResponse.json({ status: updated.status, executionId: updated.executionId });
 }

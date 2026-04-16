@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'cdn.polymarket.com' },
       { protocol: 'https', hostname: 'gamma-api.polymarket.com' },
       { protocol: 'https', hostname: 'clob.polymarket.com' },
+      { protocol: 'https', hostname: 'polymarket-upload.s3.us-east-2.amazonaws.com' },
       { protocol: 'https', hostname: 'ipfs.io' },
       { protocol: 'https', hostname: 'gateway.pinata.cloud' },
       { protocol: 'https', hostname: 'cloudflare-ipfs.com' },

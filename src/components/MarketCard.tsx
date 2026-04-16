@@ -153,15 +153,16 @@ export function MarketCard({ market, trust }: MarketCardProps) {
 
 export function MarketCardSkeleton() {
     return (
-        <div className="market-card bg-slate-800/50 rounded-2xl p-5 animate-pulse">
-            <div className="w-12 h-12 rounded-xl bg-slate-700 mb-4"></div>
-            <div className="h-6 bg-slate-700 rounded mb-2 w-3/4"></div>
-            <div className="h-6 bg-slate-700 rounded mb-4 w-1/2"></div>
+        <div className="market-card bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50 relative overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"></div>
+            <div className="w-12 h-12 rounded-xl bg-slate-700/50 mb-4"></div>
+            <div className="h-6 bg-slate-700/50 rounded mb-2 w-3/4"></div>
+            <div className="h-6 bg-slate-700/50 rounded mb-4 w-1/2"></div>
             <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="h-20 bg-slate-700/50 rounded-xl"></div>
-                <div className="h-20 bg-slate-700/50 rounded-xl"></div>
+                <div className="h-20 bg-slate-700/30 rounded-xl"></div>
+                <div className="h-20 bg-slate-700/30 rounded-xl"></div>
             </div>
-            <div className="h-4 bg-slate-700 rounded w-1/3"></div>
+            <div className="h-4 bg-slate-700/50 rounded w-1/3"></div>
         </div>
     );
 }

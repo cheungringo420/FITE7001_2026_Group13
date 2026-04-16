@@ -19,7 +19,7 @@ flowchart LR
     Poly[Polymarket Gamma API]
     PolyWS[Polymarket WS / CLOB]
     Kalshi[Kalshi Trade API]
-    Options[Options Data (Mock/Providers)]
+    Options[Options Data Mock or Providers]
   end
 
   UI --> API

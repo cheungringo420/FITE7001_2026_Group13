@@ -11,6 +11,7 @@ export interface ExecutionLegTrust {
 }
 
 export interface ExecutionTrustSnapshot {
+  snapshotVersion: string;
   evaluatedAt: string;
   legs: ExecutionLegTrust[];
 }
@@ -35,6 +36,7 @@ export interface QuoteRequest {
 
 export interface ExecutionQuote {
   quoteId: string;
+  mode: 'paper' | 'live';
   legs: ExecutionLeg[];
   maxNotional: number;
   expiresAt: string;
@@ -52,19 +54,27 @@ export interface ExecutionSubmitRequest {
   quoteId: string;
   executionToken: string;
   clientNonce: string;
+  idempotencyKey?: string;
 }
 
 export interface ExecutionLegStatus {
   platform: Platform;
   orderId: string;
-  status: 'open' | 'filled' | 'cancelled' | 'rejected';
+  requestedSize: number;
+  filledSize: number;
+  limitPrice: number;
+  averageFillPrice?: number;
+  status: 'pending' | 'open' | 'partially_filled' | 'filled' | 'canceled' | 'rejected';
 }
 
 export interface ExecutionRecord {
   executionId: string;
-  status: 'submitted' | 'partially_filled' | 'filled' | 'failed' | 'cancelled';
+  quoteId: string;
+  status: 'created' | 'quoted' | 'submitted' | 'partially_filled' | 'filled' | 'canceled' | 'rejected';
   createdAt: string;
   updatedAt: string;
+  mode: 'paper' | 'live';
+  idempotencyKey: string;
   legs: ExecutionLegStatus[];
   quote: ExecutionQuote;
   trust?: ExecutionTrustSnapshot;

@@ -54,10 +54,10 @@ export function WalletButton() {
                             }
 
                             return (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                     <button
                                         onClick={openChainModal}
-                                        className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                                        className="flex items-center gap-1.5 px-2.5 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
                                     >
                                         {chain.hasIcon && chain.iconUrl && (
                                             <Image
@@ -68,15 +68,15 @@ export function WalletButton() {
                                                 className="w-4 h-4 rounded-full"
                                             />
                                         )}
-                                        {chain.name}
+                                        <span className="hidden xl:inline">{chain.name}</span>
                                     </button>
 
                                     <button
                                         onClick={openAccountModal}
-                                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-500/15 to-accent-cyan/15 hover:from-brand-500/25 hover:to-accent-cyan/25 border border-brand-500/30 text-white rounded-lg text-sm transition-colors"
+                                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-brand-500/15 to-accent-cyan/15 hover:from-brand-500/25 hover:to-accent-cyan/25 border border-brand-500/30 text-white rounded-lg text-sm transition-colors"
                                     >
                                         {account.displayBalance && (
-                                            <span className="text-slate-300">
+                                            <span className="hidden 2xl:inline text-slate-300">
                                                 {account.displayBalance}
                                             </span>
                                         )}

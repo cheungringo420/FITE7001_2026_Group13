@@ -1,25 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createExecutionQuote } from '@/lib/execution/service';
 import { ExecutionLeg, ExecutionLegTrust, ExecutionTrustSnapshot } from '@/lib/execution/types';
-import { loadUnifiedMarkets } from '@/lib/trust/markets';
+import { getCanonicalMarketSnapshot } from '@/lib/core/markets/service';
 import { extractResolutionCriteria } from '@/lib/trust/criteria';
 import { matchEvidenceForMarket } from '@/lib/trust/evidence';
 import { computeTrustAnalysis } from '@/lib/trust/scoring';
 
 async function buildTrustSnapshot(legs: ExecutionLeg[]): Promise<ExecutionTrustSnapshot | undefined> {
-  const platforms = Array.from(new Set(legs.map((leg) => leg.platform)));
-  const marketMaps = new Map<string, Awaited<ReturnType<typeof loadUnifiedMarkets>>>();
-
-  for (const platform of platforms) {
-    const markets = await loadUnifiedMarkets({ platform, limit: 200 });
-    marketMaps.set(platform, markets);
-  }
+  const snapshot = await getCanonicalMarketSnapshot();
+  const marketMap = new Map(
+    snapshot.markets.map((market) => [`${market.platform}:${market.id}`, market] as const),
+  );
 
   const trustLegs: ExecutionLegTrust[] = [];
 
   for (const leg of legs) {
-    const markets = marketMaps.get(leg.platform) || [];
-    const market = markets.find((m) => m.id === leg.marketId);
+    const market = marketMap.get(`${leg.platform}:${leg.marketId}`);
     if (!market) continue;
 
     const criteria = extractResolutionCriteria(market.question, market.description);
@@ -45,6 +41,7 @@ async function buildTrustSnapshot(legs: ExecutionLeg[]): Promise<ExecutionTrustS
   if (trustLegs.length === 0) return undefined;
 
   return {
+    snapshotVersion: snapshot.snapshotVersion,
     evaluatedAt: new Date().toISOString(),
     legs: trustLegs,
   };

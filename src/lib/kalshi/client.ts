@@ -187,9 +187,24 @@ function extractSeriesTicker(eventTicker: string): string {
  * Normalize a Kalshi market to our cross-platform format
  */
 export function normalizeKalshiMarket(market: KalshiMarket): NormalizedMarket {
-    // Kalshi prices are in cents (1-99)
-    const yesPrice = normalizeKalshiPrice(market.yes_bid || market.last_price || 50);
-    const noPrice = normalizeKalshiPrice(market.no_bid || (100 - (market.last_price || 50)));
+    const pickPrice = (values: Array<number | undefined>, fallback: number) => {
+        for (const value of values) {
+            if (typeof value === 'number' && value > 0 && value < 100) {
+                return value;
+            }
+        }
+        return fallback;
+    };
+
+    // Use ASK prices for buy-side arbitrage accuracy (fallback to bid/last)
+    const yesCents = pickPrice([market.yes_ask, market.yes_bid, market.last_price], 50);
+    const noCents = pickPrice(
+        [market.no_ask, market.no_bid, market.last_price ? (100 - market.last_price) : undefined],
+        50
+    );
+
+    const yesPrice = normalizeKalshiPrice(yesCents);
+    const noPrice = normalizeKalshiPrice(noCents);
 
     // Build Kalshi URL - use series_ticker for working URLs
     // series_ticker is extracted from event_ticker by removing suffix

@@ -14,7 +14,7 @@ interface MarketCompareCardProps {
     flagged?: boolean;
     flagging?: boolean;
     alignmentBreakdown?: ResolutionAlignmentBreakdown;
-    matchingMethod?: 'semantic' | 'text';
+    matchingMethod?: 'semantic' | 'text' | 'deterministic';
     trust?: {
         polymarket?: TrustSummaryItem;
         kalshi?: TrustSummaryItem;
@@ -43,13 +43,13 @@ export function MarketCompareCard({
     const priceDiffYes = ((polymarket.yesPrice - kalshi.yesPrice) * 100).toFixed(1);
     const priceDiffNo = ((polymarket.noPrice - kalshi.noPrice) * 100).toFixed(1);
     const matchTier = similarity >= 0.75 ? 'high' : similarity >= 0.6 ? 'medium' : 'low';
-    const matchLabel = matchTier === 'high' ? 'High confidence' : matchTier === 'medium' ? 'Related' : 'Loose match';
+    const matchLabel = matchTier === 'high' ? 'High confidence' : matchTier === 'medium' ? 'Related' : 'Low confidence';
     const alignmentScore = alignmentBreakdown?.score ?? 0;
 
     return (
         <div className={`relative rounded-2xl border transition-all duration-300 overflow-hidden ${arbitrage
-                ? 'bg-gradient-to-br from-emerald-900/30 via-slate-900 to-brand-900/30 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                : 'bg-gradient-to-br from-slate-800/90 to-slate-900/90 border-slate-700/50 hover:border-slate-600'
+            ? 'bg-gradient-to-br from-emerald-900/30 via-slate-900 to-brand-900/30 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+            : 'bg-gradient-to-br from-slate-800/90 to-slate-900/90 border-slate-700/50 hover:border-slate-600'
             }`}>
             {/* Arbitrage Badge */}
             {arbitrage && (
@@ -95,23 +95,23 @@ export function MarketCompareCard({
                         {polymarket.category || 'General'}
                     </span>
                     <span className={`px-2 py-0.5 rounded border text-xs ${matchTier === 'high'
-                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                            : matchTier === 'medium'
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : matchTier === 'medium'
+                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                            : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
                         }`}>
                         {matchLabel}
                     </span>
                     <span className={`px-2 py-0.5 rounded ${similarity >= 0.6 ? 'bg-green-500/20 text-green-400' :
-                            similarity >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
-                                'bg-slate-600/50 text-slate-400'
+                        similarity >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-slate-600/50 text-slate-400'
                         }`}>
                         {similarity >= 0.6 ? '🎯' : similarity >= 0.45 ? '🔗' : '💡'} {(similarity * 100).toFixed(0)}% similar
                     </span>
                     {alignmentBreakdown && (
                         <span className={`px-2 py-0.5 rounded ${alignmentScore >= 0.7 ? 'bg-emerald-500/15 text-emerald-300' :
-                                alignmentScore >= 0.5 ? 'bg-amber-500/15 text-amber-300' :
-                                    'bg-rose-500/15 text-rose-300'
+                            alignmentScore >= 0.5 ? 'bg-amber-500/15 text-amber-300' :
+                                'bg-rose-500/15 text-rose-300'
                             }`}>
                             🧭 {Math.round(alignmentScore * 100)}% aligned
                         </span>
@@ -135,8 +135,8 @@ export function MarketCompareCard({
                             onClick={onFlagMismatch}
                             disabled={flagged || flagging}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${flagged
-                                    ? 'bg-red-500/10 text-red-300 border-red-500/40 cursor-not-allowed'
-                                    : 'bg-slate-800/60 text-slate-300 border-slate-600/60 hover:bg-slate-700/60 hover:text-white'
+                                ? 'bg-red-500/10 text-red-300 border-red-500/40 cursor-not-allowed'
+                                : 'bg-slate-800/60 text-slate-300 border-slate-600/60 hover:bg-slate-700/60 hover:text-white'
                                 }`}
                         >
                             {flagging ? 'Flagging...' : flagged ? 'Flagged mismatch' : 'Flag mismatch'}
@@ -151,16 +151,16 @@ export function MarketCompareCard({
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-slate-400">Resolution Alignment Breakdown</span>
                             <span className={`text-xs font-semibold ${alignmentScore >= 0.7 ? 'text-emerald-300' :
-                                    alignmentScore >= 0.5 ? 'text-amber-300' :
-                                        'text-rose-300'
+                                alignmentScore >= 0.5 ? 'text-amber-300' :
+                                    'text-rose-300'
                                 }`}>
                                 {Math.round(alignmentScore * 100)}%
                             </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             <div className={`flex items-center justify-between p-2 rounded border ${alignmentBreakdown.criteria.explicitDate.match
-                                    ? 'border-emerald-500/30 bg-emerald-500/10'
-                                    : 'border-slate-700/50 bg-slate-800/40'
+                                ? 'border-emerald-500/30 bg-emerald-500/10'
+                                : 'border-slate-700/50 bg-slate-800/40'
                                 }`}>
                                 <span>Explicit date</span>
                                 <span className="text-slate-400">
@@ -168,8 +168,8 @@ export function MarketCompareCard({
                                 </span>
                             </div>
                             <div className={`flex items-center justify-between p-2 rounded border ${alignmentBreakdown.criteria.objectiveThreshold.match
-                                    ? 'border-emerald-500/30 bg-emerald-500/10'
-                                    : 'border-slate-700/50 bg-slate-800/40'
+                                ? 'border-emerald-500/30 bg-emerald-500/10'
+                                : 'border-slate-700/50 bg-slate-800/40'
                                 }`}>
                                 <span>Objective threshold</span>
                                 <span className="text-slate-400">
@@ -177,8 +177,8 @@ export function MarketCompareCard({
                                 </span>
                             </div>
                             <div className={`flex items-center justify-between p-2 rounded border ${alignmentBreakdown.criteria.resolutionWording.match
-                                    ? 'border-emerald-500/30 bg-emerald-500/10'
-                                    : 'border-slate-700/50 bg-slate-800/40'
+                                ? 'border-emerald-500/30 bg-emerald-500/10'
+                                : 'border-slate-700/50 bg-slate-800/40'
                                 }`}>
                                 <span>Resolution wording</span>
                                 <span className="text-slate-400">
@@ -186,8 +186,8 @@ export function MarketCompareCard({
                                 </span>
                             </div>
                             <div className={`flex items-center justify-between p-2 rounded border ${alignmentBreakdown.criteria.timeWindow.match
-                                    ? 'border-emerald-500/30 bg-emerald-500/10'
-                                    : 'border-slate-700/50 bg-slate-800/40'
+                                ? 'border-emerald-500/30 bg-emerald-500/10'
+                                : 'border-slate-700/50 bg-slate-800/40'
                                 }`}>
                                 <span>Time window</span>
                                 <span className="text-slate-400">
@@ -195,8 +195,8 @@ export function MarketCompareCard({
                                 </span>
                             </div>
                             <div className={`flex items-center justify-between p-2 rounded border ${alignmentBreakdown.criteria.ambiguityFlags.match
-                                    ? 'border-emerald-500/30 bg-emerald-500/10'
-                                    : 'border-slate-700/50 bg-slate-800/40'
+                                ? 'border-emerald-500/30 bg-emerald-500/10'
+                                : 'border-slate-700/50 bg-slate-800/40'
                                 }`}>
                                 <span>Ambiguity flags</span>
                                 <span className="text-slate-400">
@@ -244,8 +244,8 @@ export function MarketCompareCard({
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">Yes</span>
                             <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform1.name === 'polymarket'
-                                    ? 'text-green-400 animate-pulse'
-                                    : 'text-green-400'
+                                ? 'text-green-400 animate-pulse'
+                                : 'text-green-400'
                                 }`}>
                                 {(polymarket.yesPrice * 100).toFixed(1)}¢
                             </span>
@@ -253,8 +253,8 @@ export function MarketCompareCard({
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-400">No</span>
                             <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform1.name === 'polymarket'
-                                    ? 'text-red-400 animate-pulse'
-                                    : 'text-red-400'
+                                ? 'text-red-400 animate-pulse'
+                                : 'text-red-400'
                                 }`}>
                                 {(polymarket.noPrice * 100).toFixed(1)}¢
                             </span>
@@ -308,8 +308,8 @@ export function MarketCompareCard({
                             <span className="text-sm text-slate-400">Yes</span>
                             <div className="flex items-center gap-2">
                                 <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-no-a-yes-b' && arbitrage.platform2.name === 'kalshi'
-                                        ? 'text-green-400 animate-pulse'
-                                        : 'text-green-400'
+                                    ? 'text-green-400 animate-pulse'
+                                    : 'text-green-400'
                                     }`}>
                                     {(kalshi.yesPrice * 100).toFixed(1)}¢
                                 </span>
@@ -324,8 +324,8 @@ export function MarketCompareCard({
                             <span className="text-sm text-slate-400">No</span>
                             <div className="flex items-center gap-2">
                                 <span className={`text-lg font-bold ${arbitrage?.strategy === 'buy-yes-a-no-b' && arbitrage.platform2.name === 'kalshi'
-                                        ? 'text-red-400 animate-pulse'
-                                        : 'text-red-400'
+                                    ? 'text-red-400 animate-pulse'
+                                    : 'text-red-400'
                                     }`}>
                                     {(kalshi.noPrice * 100).toFixed(1)}¢
                                 </span>
@@ -359,8 +359,8 @@ export function MarketCompareCard({
 
             {/* Arbitrage Strategy - Always show, but dim if no opportunity */}
             <div className={`p-4 border-t ${arbitrage
-                    ? 'bg-green-500/5 border-green-500/30'
-                    : 'bg-slate-800/30 border-slate-700/30'
+                ? 'bg-green-500/5 border-green-500/30'
+                : 'bg-slate-800/30 border-slate-700/30'
                 }`}>
                 <div className="flex items-center justify-between">
                     <div className={arbitrage ? '' : 'opacity-60'}>
@@ -419,8 +419,8 @@ export function MarketCompareCard({
                         onClick={() => arbitrage && onExecuteArbitrage && onExecuteArbitrage(arbitrage)}
                         disabled={!arbitrage}
                         className={`px-4 py-2 font-semibold rounded-lg transition-colors text-sm whitespace-nowrap ${arbitrage
-                                ? 'bg-green-500 hover:bg-green-600 text-black cursor-pointer'
-                                : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+                            ? 'bg-green-500 hover:bg-green-600 text-black cursor-pointer'
+                            : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                             }`}
                     >
                         {arbitrage ? 'Execute' : 'No Opportunity'}
@@ -507,8 +507,8 @@ export function SingleMarketCard({ market, platform, trust }: SingleMarketCardPr
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`block text-xs truncate text-center transition-colors ${isPoly
-                            ? 'text-brand-300/60 hover:text-brand-300'
-                            : 'text-accent-cyan/60 hover:text-accent-cyan'
+                        ? 'text-brand-300/60 hover:text-brand-300'
+                        : 'text-accent-cyan/60 hover:text-accent-cyan'
                         }`}
                     title={market.url}
                 >
@@ -521,24 +521,25 @@ export function SingleMarketCard({ market, platform, trust }: SingleMarketCardPr
 
 export function MarketCompareCardSkeleton() {
     return (
-        <div className="bg-slate-800/50 rounded-2xl animate-pulse">
+        <div className="bg-slate-800/50 rounded-2xl relative overflow-hidden border border-slate-700/50">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"></div>
             <div className="p-5 border-b border-slate-700/50">
-                <div className="h-6 bg-slate-700 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-slate-700 rounded w-1/4"></div>
+                <div className="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-slate-700/30 rounded w-1/4"></div>
             </div>
             <div className="grid grid-cols-2 divide-x divide-slate-700/50">
                 <div className="p-4">
-                    <div className="h-8 bg-slate-700 rounded w-24 mb-4"></div>
+                    <div className="h-8 bg-slate-700/50 rounded w-24 mb-4"></div>
                     <div className="space-y-3">
-                        <div className="h-6 bg-slate-700/50 rounded"></div>
-                        <div className="h-6 bg-slate-700/50 rounded"></div>
+                        <div className="h-6 bg-slate-700/30 rounded"></div>
+                        <div className="h-6 bg-slate-700/30 rounded"></div>
                     </div>
                 </div>
                 <div className="p-4">
-                    <div className="h-8 bg-slate-700 rounded w-24 mb-4"></div>
+                    <div className="h-8 bg-slate-700/50 rounded w-24 mb-4"></div>
                     <div className="space-y-3">
-                        <div className="h-6 bg-slate-700/50 rounded"></div>
-                        <div className="h-6 bg-slate-700/50 rounded"></div>
+                        <div className="h-6 bg-slate-700/30 rounded"></div>
+                        <div className="h-6 bg-slate-700/30 rounded"></div>
                     </div>
                 </div>
             </div>

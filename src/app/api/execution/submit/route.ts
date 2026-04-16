@@ -12,12 +12,14 @@ export async function POST(request: Request) {
       quoteId: body.quoteId,
       executionToken: body.executionToken,
       clientNonce: body.clientNonce,
+      idempotencyKey: body.idempotencyKey ? String(body.idempotencyKey) : undefined,
     });
 
     return NextResponse.json({
       executionId: record.executionId,
       status: record.status,
       legs: record.legs,
+      mode: record.mode,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to submit execution';

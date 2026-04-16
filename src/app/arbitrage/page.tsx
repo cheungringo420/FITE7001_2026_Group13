@@ -6,9 +6,11 @@ import { ExecuteArbitrageModal, TrustBadge } from '@/components';
 import { useMarketStream } from '@/hooks/useMarketStream';
 import { buildTrustMap, fetchTrustSummary, trustKey } from '@/lib/trust/client';
 import { TrustSummaryItem } from '@/lib/trust/types';
+import { isLabsEnabled } from '@/lib/config/features';
 
 interface ScanResult {
-    opportunities: ArbitrageOpportunity[];
+    snapshotVersion?: string;
+    opportunities: Array<ArbitrageOpportunity & { confidence?: 'high' | 'medium' | 'low' }>;
     matchedMarkets: number;
     polymarketCount: number;
     kalshiCount: number;
@@ -16,6 +18,8 @@ interface ScanResult {
 }
 
 export default function ArbitragePage() {
+    const labsEnabled = isLabsEnabled();
+    const executionMode = process.env.NEXT_PUBLIC_EXECUTION_MODE === 'live' ? 'live' : 'paper';
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -31,7 +35,7 @@ export default function ArbitragePage() {
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch(strictMode ? '/api/arbitrage/scan?strict=true' : '/api/arbitrage/scan');
+            const response = await fetch(strictMode ? '/api/core/opportunities?strict=true' : '/api/core/opportunities');
 
             if (!response.ok) {
                 throw new Error('Failed to scan for arbitrage');
@@ -105,8 +109,17 @@ export default function ArbitragePage() {
                         <span className={`chip ${streamConnected ? 'chip-active' : ''}`}>
                             Stream {streamConnected ? 'Connected' : 'Offline'}
                         </span>
+                        <span className={`chip ${executionMode === 'live' ? 'chip-active' : ''}`}>
+                            {executionMode === 'live' ? 'Live' : 'Paper'} execution
+                        </span>
+                        <span className={`chip ${labsEnabled ? 'chip-active' : ''}`}>
+                            Labs {labsEnabled ? 'On' : 'Off'}
+                        </span>
                         {snapshot?.updatedAt && (
                             <span className="chip">Last snapshot {new Date(snapshot.updatedAt).toLocaleTimeString()}</span>
+                        )}
+                        {scanResult?.snapshotVersion && (
+                            <span className="chip">Snapshot {scanResult.snapshotVersion.slice(0, 8)}</span>
                         )}
                     </div>
                     <p className="text-lg text-slate-400 max-w-2xl mb-8">
@@ -194,18 +207,18 @@ export default function ArbitragePage() {
                             <div className="text-sm text-slate-400 mb-1">Opportunities Found</div>
                             <div className="text-2xl font-bold text-green-400 neon-text-green">{opportunities.length}</div>
                         </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
-                    <div className="text-sm text-slate-400 mb-1">Matched Markets</div>
-                    <div className="text-2xl font-bold text-white">{scanResult.matchedMarkets}</div>
-                </div>
-                <div className="bg-brand-500/10 rounded-xl p-4 border border-brand-500/30 web3-glow">
-                    <div className="text-sm text-brand-300 mb-1">Polymarket</div>
-                    <div className="text-2xl font-bold text-brand-300">{scanResult.polymarketCount}</div>
-                </div>
-                <div className="bg-accent-cyan/10 rounded-xl p-4 border border-accent-cyan/30 web3-glow">
-                    <div className="text-sm text-accent-cyan mb-1">Kalshi</div>
-                    <div className="text-2xl font-bold text-accent-cyan">{scanResult.kalshiCount}</div>
-                </div>
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 glass">
+                            <div className="text-sm text-slate-400 mb-1">Matched Markets</div>
+                            <div className="text-2xl font-bold text-white">{scanResult.matchedMarkets}</div>
+                        </div>
+                        <div className="bg-brand-500/10 rounded-xl p-4 border border-brand-500/30 web3-glow">
+                            <div className="text-sm text-brand-300 mb-1">Polymarket</div>
+                            <div className="text-2xl font-bold text-brand-300">{scanResult.polymarketCount}</div>
+                        </div>
+                        <div className="bg-accent-cyan/10 rounded-xl p-4 border border-accent-cyan/30 web3-glow">
+                            <div className="text-sm text-accent-cyan mb-1">Kalshi</div>
+                            <div className="text-2xl font-bold text-accent-cyan">{scanResult.kalshiCount}</div>
+                        </div>
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
                         Last scanned: {new Date(scanResult.scannedAt).toLocaleTimeString()}
@@ -257,166 +270,172 @@ export default function ArbitragePage() {
                 )}
 
                 <div className="space-y-4">
-                    {opportunities.map((opp) => {
+                    {opportunities.map((opp, index) => {
                         const trust1 = trustMap[trustKey(opp.platform1.name, opp.platform1.marketId)];
                         const trust2 = trustMap[trustKey(opp.platform2.name, opp.platform2.marketId)];
 
                         return (
-                        <div
-                            key={opp.id}
-                            className="web3-card bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl p-6 border border-green-500/30 hover:border-green-500/50 hover:shadow-glow-lg hover:shadow-green-500/20 transition-all duration-300"
-                        >
-                            {/* Header */}
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1 pr-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.type === 'cross-platform'
-                                            ? 'bg-yellow-500/20 text-yellow-400'
-                                            : 'bg-slate-600/50 text-slate-300'
-                                            }`}>
-                                            {opp.type === 'cross-platform' ? '🔀 CROSS-PLATFORM' : '📍 SINGLE PLATFORM'}
-                                        </span>
-                                        {trust1 && (
-                                            <TrustBadge score={trust1.trustScore} compact />
-                                        )}
+                            <div
+                                key={opp.id}
+                                className="animate-slide-up web3-card bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl p-6 border border-green-500/30 hover:border-green-500/50 hover:shadow-glow-lg hover:shadow-green-500/20 transition-all duration-300"
+                                style={{ animationFillMode: 'both', animationDelay: `${Math.min(index * 50, 1000)}ms` }}
+                            >
+                                {/* Header */}
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex-1 pr-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.type === 'cross-platform'
+                                                ? 'bg-yellow-500/20 text-yellow-400'
+                                                : 'bg-slate-600/50 text-slate-300'
+                                                }`}>
+                                                {opp.type === 'cross-platform' ? '🔀 CROSS-PLATFORM' : '📍 SINGLE PLATFORM'}
+                                            </span>
+                                            {opp.confidence === 'low' && (
+                                                <span className="px-2 py-1 rounded text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                                                    Low confidence
+                                                </span>
+                                            )}
+                                            {trust1 && (
+                                                <TrustBadge score={trust1.trustScore} compact />
+                                            )}
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-white">
+                                            {opp.question}
+                                        </h3>
                                     </div>
-                                    <h3 className="text-lg font-semibold text-white">
-                                        {opp.question}
-                                    </h3>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-bold text-green-400">
+                                            +{opp.profitPercentage.toFixed(2)}%
+                                        </div>
+                                        <div className="text-sm text-slate-400">
+                                            ${opp.guaranteedProfit.toFixed(4)} profit
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-2xl font-bold text-green-400">
-                                        +{opp.profitPercentage.toFixed(2)}%
+
+                                {/* Platforms */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div className="bg-slate-800/50 rounded-xl p-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform1.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
+                                                }`}>
+                                                {opp.platform1.name.toUpperCase()}
+                                            </span>
+                                            {trust1 && <TrustBadge score={trust1.trustScore} compact />}
+                                            {opp.platform1.url && (
+                                                <a
+                                                    href={opp.platform1.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700/50 rounded"
+                                                    title="Open Market"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div>
+                                                <span className="text-slate-400">Yes:</span>
+                                                <span className="ml-2 text-green-400 font-mono">
+                                                    {(opp.platform1.yesPrice * 100).toFixed(1)}¢
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">No:</span>
+                                                <span className="ml-2 text-red-400 font-mono">
+                                                    {(opp.platform1.noPrice * 100).toFixed(1)}¢
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    <div className="bg-slate-800/50 rounded-xl p-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform2.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
+                                                }`}>
+                                                {opp.platform2.name.toUpperCase()}
+                                            </span>
+                                            {trust2 && <TrustBadge score={trust2.trustScore} compact />}
+                                            {opp.platform2.url && (
+                                                <a
+                                                    href={opp.platform2.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700/50 rounded"
+                                                    title="Open Market"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div>
+                                                <span className="text-slate-400">Yes:</span>
+                                                <span className="ml-2 text-green-400 font-mono">
+                                                    {(opp.platform2.yesPrice * 100).toFixed(1)}¢
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">No:</span>
+                                                <span className="ml-2 text-red-400 font-mono">
+                                                    {(opp.platform2.noPrice * 100).toFixed(1)}¢
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Strategy Instructions */}
+                                <div className="bg-slate-900/50 rounded-xl p-4 mb-4 border border-dashed border-slate-600">
+                                    <div className="text-sm text-slate-400 mb-2">📋 Strategy:</div>
+                                    {opp.type === 'single-platform' ? (
+                                        <div className="text-sm text-white">
+                                            Buy <span className="text-green-400 font-semibold">YES</span> +
+                                            Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform1.name.toUpperCase()}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-white">
+                                            {opp.strategy === 'buy-yes-a-no-b' ? (
+                                                <>
+                                                    Buy <span className="text-green-400 font-semibold">YES</span> on {opp.platform1.name.toUpperCase()} @ {(opp.platform1.yesPrice * 100).toFixed(1)}¢ +
+                                                    Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform2.name.toUpperCase()} @ {(opp.platform2.noPrice * 100).toFixed(1)}¢
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform1.name.toUpperCase()} @ {(opp.platform1.noPrice * 100).toFixed(1)}¢ +
+                                                    Buy <span className="text-green-400 font-semibold">YES</span> on {opp.platform2.name.toUpperCase()} @ {(opp.platform2.yesPrice * 100).toFixed(1)}¢
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Action */}
+                                <div className="flex items-center justify-between">
                                     <div className="text-sm text-slate-400">
-                                        ${opp.guaranteedProfit.toFixed(4)} profit
+                                        Total cost: <span className="text-white font-mono">${opp.totalCost.toFixed(4)}</span> →
+                                        Payout: <span className="text-green-400 font-mono">$1.00</span>
                                     </div>
                                     {trust1 && (
                                         <div className="text-xs text-brand-300 mt-1 font-mono">
                                             RAAS: {(opp.profitPercentage / 100 * (trust1.trustScore / 100) * 0.98).toFixed(4)}
                                         </div>
                                     )}
+                                    <button
+                                        onClick={() => setSelectedOpportunity(opp)}
+                                        className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-semibold transition-colors"
+                                    >
+                                        Execute Trade
+                                    </button>
                                 </div>
                             </div>
-
-                            {/* Platforms */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="bg-slate-800/50 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform1.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
-                                            }`}>
-                                            {opp.platform1.name.toUpperCase()}
-                                        </span>
-                                        {trust1 && <TrustBadge score={trust1.trustScore} compact />}
-                                        {opp.platform1.url && (
-                                            <a
-                                                href={opp.platform1.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700/50 rounded"
-                                                title="Open Market"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                </svg>
-                                            </a>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                            <span className="text-slate-400">Yes:</span>
-                                            <span className="ml-2 text-green-400 font-mono">
-                                                {(opp.platform1.yesPrice * 100).toFixed(1)}¢
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-slate-400">No:</span>
-                                            <span className="ml-2 text-red-400 font-mono">
-                                                {(opp.platform1.noPrice * 100).toFixed(1)}¢
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-800/50 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${opp.platform2.name === 'polymarket' ? 'bg-brand-500/20 text-brand-300' : 'bg-accent-cyan/20 text-accent-cyan'
-                                            }`}>
-                                            {opp.platform2.name.toUpperCase()}
-                                        </span>
-                                        {trust2 && <TrustBadge score={trust2.trustScore} compact />}
-                                        {opp.platform2.url && (
-                                            <a
-                                                href={opp.platform2.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700/50 rounded"
-                                                title="Open Market"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                </svg>
-                                            </a>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                            <span className="text-slate-400">Yes:</span>
-                                            <span className="ml-2 text-green-400 font-mono">
-                                                {(opp.platform2.yesPrice * 100).toFixed(1)}¢
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-slate-400">No:</span>
-                                            <span className="ml-2 text-red-400 font-mono">
-                                                {(opp.platform2.noPrice * 100).toFixed(1)}¢
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Strategy Instructions */}
-                            <div className="bg-slate-900/50 rounded-xl p-4 mb-4 border border-dashed border-slate-600">
-                                <div className="text-sm text-slate-400 mb-2">📋 Strategy:</div>
-                                {opp.type === 'single-platform' ? (
-                                    <div className="text-sm text-white">
-                                        Buy <span className="text-green-400 font-semibold">YES</span> +
-                                        Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform1.name.toUpperCase()}
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-white">
-                                        {opp.strategy === 'buy-yes-a-no-b' ? (
-                                            <>
-                                                Buy <span className="text-green-400 font-semibold">YES</span> on {opp.platform1.name.toUpperCase()} @ {(opp.platform1.yesPrice * 100).toFixed(1)}¢ +
-                                                Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform2.name.toUpperCase()} @ {(opp.platform2.noPrice * 100).toFixed(1)}¢
-                                            </>
-                                        ) : (
-                                            <>
-                                                Buy <span className="text-red-400 font-semibold">NO</span> on {opp.platform1.name.toUpperCase()} @ {(opp.platform1.noPrice * 100).toFixed(1)}¢ +
-                                                Buy <span className="text-green-400 font-semibold">YES</span> on {opp.platform2.name.toUpperCase()} @ {(opp.platform2.yesPrice * 100).toFixed(1)}¢
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Action */}
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-slate-400">
-                                    Total cost: <span className="text-white font-mono">${opp.totalCost.toFixed(4)}</span> →
-                                    Payout: <span className="text-green-400 font-mono">$1.00</span>
-                                </div>
-                                <button
-                                    onClick={() => setSelectedOpportunity(opp)}
-                                    className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-semibold transition-colors"
-                                >
-                                    Execute Trade
-                                </button>
-                            </div>
-                        </div>
                         );
                     })}
                 </div>
