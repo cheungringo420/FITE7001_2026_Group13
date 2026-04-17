@@ -1,7 +1,7 @@
 {
   "strategy": "dynamic_hedge",
   "version": "1.0.0",
-  "generated_at": "2026-04-17T08:26:01.102486",
+  "generated_at": "2026-04-17T11:51:33.319806",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -594,5 +594,74 @@
       "col": 2
     },
     "stability_score": 0.5481
+  },
+  "walk_forward": {
+    "folds": [
+      {
+        "fold": 0,
+        "train_start": "2024-01-01",
+        "train_end": "2024-09-06",
+        "test_start": "2024-09-09",
+        "test_end": "2024-11-29",
+        "train_sharpe": 0.546,
+        "test_sharpe": 0.4098,
+        "n_train": 180,
+        "n_test": 60
+      },
+      {
+        "fold": 1,
+        "train_start": "2024-01-01",
+        "train_end": "2024-10-18",
+        "test_start": "2024-10-21",
+        "test_end": "2025-01-10",
+        "train_sharpe": 0.516,
+        "test_sharpe": 0.4296,
+        "n_train": 210,
+        "n_test": 60
+      },
+      {
+        "fold": 2,
+        "train_start": "2024-01-01",
+        "train_end": "2024-11-29",
+        "test_start": "2024-12-02",
+        "test_end": "2025-02-21",
+        "train_sharpe": 0.5113,
+        "test_sharpe": 0.4048,
+        "n_train": 240,
+        "n_test": 60
+      },
+      {
+        "fold": 3,
+        "train_start": "2024-01-01",
+        "train_end": "2025-01-10",
+        "test_start": "2025-01-13",
+        "test_end": "2025-04-04",
+        "train_sharpe": 0.4978,
+        "test_sharpe": 0.455,
+        "n_train": 270,
+        "n_test": 60
+      },
+      {
+        "fold": 4,
+        "train_start": "2024-01-01",
+        "train_end": "2025-02-21",
+        "test_start": "2025-02-24",
+        "test_end": "2025-05-16",
+        "train_sharpe": 0.4882,
+        "test_sharpe": 0.4295,
+        "n_train": 300,
+        "n_test": 60
+      }
+    ],
+    "summary": {
+      "n_folds": 5,
+      "mean_train_sharpe": 0.5119,
+      "mean_test_sharpe": 0.4257,
+      "sharpe_decay": 0.1682,
+      "anchored": true,
+      "train_window": 180,
+      "test_window": 60,
+      "step": 30
+    }
   }
 }

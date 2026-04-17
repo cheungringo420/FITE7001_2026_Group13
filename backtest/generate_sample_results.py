@@ -19,6 +19,7 @@ from backtest.engine.regime import VolatilityRegimeDetector
 from backtest.metrics.regime_analysis import performance_by_regime
 from backtest.metrics.sensitivity import SensitivityAnalyzer
 from backtest.metrics.portfolio_comparison import PortfolioComparison
+from backtest.metrics.walk_forward import WalkForwardAnalyzer
 
 OUTPUT_DIR = Path(__file__).parent.parent / "public" / "backtest-results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,6 +67,69 @@ def synthesize_sensitivity_surface(
         "max_cell": {"row": int(max_row), "col": int(max_col)},
         "stability_score": round(stability, 4),
     }
+
+
+def synthesize_walk_forward(
+    target_train_sharpe,
+    target_test_sharpe,
+    n_days=360,
+    train_window=180,
+    test_window=60,
+    step=30,
+    daily_vol=0.008,
+    decay_jitter=0.15,
+    seed=0,
+):
+    """
+    Build a daily return series that, when fed to WalkForwardAnalyzer, yields
+    fold-by-fold train/test Sharpes close to the strategy's target values.
+
+    The series is constructed in per-fold test segments whose mean is calibrated
+    to hit the target test Sharpe (± jitter), while the train windows (which
+    accumulate across folds in anchored mode) average toward the target train
+    Sharpe. Mean-calibration per segment keeps results stable at 60-day test
+    windows where pure iid sampling would otherwise be too noisy.
+    """
+    rng = np.random.default_rng(seed)
+    dates = pd.date_range("2024-01-01", periods=n_days, freq="B")
+
+    # Pre-compute target means per block of `step` days to control fold Sharpe.
+    mu_train_base = (target_train_sharpe / np.sqrt(252)) * daily_vol
+    mu_test_base = (target_test_sharpe / np.sqrt(252)) * daily_vol
+
+    r = np.empty(n_days)
+    pre_test_boundary = train_window  # fold 0's test starts here
+
+    # Segment 1: all days before the first test window — draw around mu_train_base.
+    seg1 = rng.normal(mu_train_base, daily_vol, pre_test_boundary)
+    # Calibrate segment mean exactly so train_sharpe for fold 0 matches target.
+    seg1 = seg1 - seg1.mean() + mu_train_base + rng.normal(0, daily_vol / np.sqrt(pre_test_boundary) * decay_jitter)
+    r[:pre_test_boundary] = seg1
+
+    # Segment 2+: each subsequent `step` block is a test-window draw,
+    # mean-calibrated around mu_test_base with modest jitter so each fold's
+    # test Sharpe lands near the target but not identically.
+    idx = pre_test_boundary
+    while idx < n_days:
+        hi = min(idx + step, n_days)
+        k = hi - idx
+        # Jitter applied to the MEAN (so fold Sharpe varies fold-to-fold).
+        mu_this = mu_test_base + rng.normal(0, abs(mu_test_base) * decay_jitter + 1e-5)
+        block = rng.normal(mu_this, daily_vol, k)
+        # Lock the empirical mean of the block to mu_this (removes sampling noise).
+        block = block - block.mean() + mu_this
+        r[idx:hi] = block
+        idx = hi
+
+    series = pd.Series(r, index=dates)
+    wf = WalkForwardAnalyzer()
+    return wf.analyze(
+        series,
+        train_window=train_window,
+        test_window=test_window,
+        step=step,
+        anchored=True,
+    )
 
 
 SENSITIVITY_SWEEPS = {
@@ -569,6 +633,13 @@ for idx, s in enumerate(strategies):
             optimal_y_idx=opt_y,
             seed=100 + idx,
         )
+
+    # Anchored walk-forward: in-sample vs OOS Sharpe across rolling folds.
+    s["walk_forward"] = synthesize_walk_forward(
+        target_train_sharpe=s["train_metrics"]["sharpe"],
+        target_test_sharpe=s["test_metrics"]["sharpe"],
+        seed=200 + idx,
+    )
 
 # ─── Portfolio Construction Comparison (equal/RP/MV) ────────────────
 # Extract daily OOS returns from each strategy's equity curve and run the

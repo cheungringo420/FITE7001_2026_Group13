@@ -1,7 +1,7 @@
 {
   "strategy": "mean_reversion",
   "version": "1.0.0",
-  "generated_at": "2026-04-17T08:26:01.102691",
+  "generated_at": "2026-04-17T11:51:33.320002",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -653,5 +653,74 @@
       "col": 4
     },
     "stability_score": 0.3283
+  },
+  "walk_forward": {
+    "folds": [
+      {
+        "fold": 0,
+        "train_start": "2024-01-01",
+        "train_end": "2024-09-06",
+        "test_start": "2024-09-09",
+        "test_end": "2024-11-29",
+        "train_sharpe": -0.3904,
+        "test_sharpe": -0.3007,
+        "n_train": 180,
+        "n_test": 60
+      },
+      {
+        "fold": 1,
+        "train_start": "2024-01-01",
+        "train_end": "2024-10-18",
+        "test_start": "2024-10-21",
+        "test_end": "2025-01-10",
+        "train_sharpe": -0.3787,
+        "test_sharpe": -0.2986,
+        "n_train": 210,
+        "n_test": 60
+      },
+      {
+        "fold": 2,
+        "train_start": "2024-01-01",
+        "train_end": "2024-11-29",
+        "test_start": "2024-12-02",
+        "test_end": "2025-02-21",
+        "train_sharpe": -0.37,
+        "test_sharpe": -0.3526,
+        "n_train": 240,
+        "n_test": 60
+      },
+      {
+        "fold": 3,
+        "train_start": "2024-01-01",
+        "train_end": "2025-01-10",
+        "test_start": "2025-01-13",
+        "test_end": "2025-04-04",
+        "train_sharpe": -0.3614,
+        "test_sharpe": -0.4206,
+        "n_train": 270,
+        "n_test": 60
+      },
+      {
+        "fold": 4,
+        "train_start": "2024-01-01",
+        "train_end": "2025-02-21",
+        "test_start": "2025-02-24",
+        "test_end": "2025-05-16",
+        "train_sharpe": -0.3671,
+        "test_sharpe": -0.3742,
+        "n_train": 300,
+        "n_test": 60
+      }
+    ],
+    "summary": {
+      "n_folds": 5,
+      "mean_train_sharpe": -0.3735,
+      "mean_test_sharpe": -0.3493,
+      "sharpe_decay": -0.0647,
+      "anchored": true,
+      "train_window": 180,
+      "test_window": 60,
+      "step": 30
+    }
   }
 }

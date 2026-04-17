@@ -10,3 +10,4 @@ from .deflated_sharpe import (
 from .regime_analysis import performance_by_regime
 from .sensitivity import SensitivityAnalyzer
 from .portfolio_comparison import PortfolioComparison
+from .walk_forward import WalkForwardAnalyzer

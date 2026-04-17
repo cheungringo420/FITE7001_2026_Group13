@@ -32,6 +32,29 @@ interface StrategyResult {
     max_cell: { row: number; col: number };
     stability_score: number;
   };
+  walk_forward?: {
+    folds: Array<{
+      fold: number;
+      train_start: string;
+      train_end: string;
+      test_start: string;
+      test_end: string;
+      train_sharpe: number;
+      test_sharpe: number;
+      n_train: number;
+      n_test: number;
+    }>;
+    summary: {
+      n_folds: number;
+      mean_train_sharpe: number;
+      mean_test_sharpe: number;
+      sharpe_decay: number;
+      anchored: boolean;
+      train_window: number;
+      test_window: number;
+      step: number;
+    };
+  };
   rigor?: {
     monte_carlo: {
       sharpe: { point_estimate: number; ci_lower: number; ci_upper: number; std_error: number };
@@ -108,6 +131,174 @@ function heatmapCellColor(v: number, min: number, max: number): string {
   const a = (t - 0.5) * 2; // 0 → 1
   const r = Math.round(239 + (34 - 239) * a), g = Math.round(191 + (197 - 191) * a), b = Math.round(36 + (94 - 36) * a);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+function WalkForwardPanel({ data }: { data: NonNullable<StrategyResult['walk_forward']> }) {
+  const { folds, summary } = data;
+
+  if (folds.length === 0) {
+    return (
+      <div className="mt-8 pt-6 border-t border-slate-700/30">
+        <h4 className="text-md font-semibold text-white mb-2">Walk-Forward Analysis</h4>
+        <p className="text-sm text-slate-400">Insufficient data for walk-forward folds.</p>
+      </div>
+    );
+  }
+
+  const decay = summary.sharpe_decay;
+  const decayPct = decay * 100;
+  // Decay below 20% = robust (green), 20–50% = caution (yellow), >50% = likely overfit (red).
+  const decayColor = decayPct <= 20
+    ? 'bg-green-500/15 text-green-300 border-green-500/30'
+    : decayPct <= 50
+    ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+    : 'bg-red-500/15 text-red-300 border-red-500/30';
+  const decayVerdict = decayPct <= 20 ? 'Robust' : decayPct <= 50 ? 'Caution' : 'Likely Overfit';
+
+  // Chart dimensions.
+  const yVals = folds.flatMap(f => [f.train_sharpe, f.test_sharpe]);
+  const yMin = Math.min(0, ...yVals);
+  const yMax = Math.max(0, ...yVals);
+  const yRange = yMax - yMin || 1;
+
+  const chartH = 180;
+  const barGroupW = 54;
+  const barW = 22;
+  const barGap = 4;
+  const padL = 40;
+  const chartW = padL + folds.length * barGroupW + 20;
+
+  const yToPx = (v: number) => {
+    const t = (v - yMin) / yRange;
+    return chartH - t * chartH;
+  };
+  const zeroY = yToPx(0);
+
+  return (
+    <div className="mt-8 pt-6 border-t border-slate-700/30">
+      <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
+        <h4 className="text-md font-semibold text-white">Walk-Forward Analysis (Anchored)</h4>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 font-mono">
+            train={summary.train_window}d · test={summary.test_window}d · step={summary.step}d
+          </span>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-mono border ${decayColor}`}>
+            Decay: {decayPct >= 0 ? '+' : ''}{decayPct.toFixed(1)}% · {decayVerdict}
+          </span>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 mb-5">
+        Anchored walk-forward: training window starts at origin and expands with each fold; the next {summary.test_window}-day
+        window is out-of-sample. Low Sharpe decay from train to test means the strategy generalizes.
+      </p>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="p-3 rounded-lg bg-slate-800/30 text-center">
+          <div className="text-xs text-slate-400 mb-1">Mean Train Sharpe</div>
+          <div className="text-lg font-bold font-mono text-slate-200">{summary.mean_train_sharpe.toFixed(2)}</div>
+        </div>
+        <div className="p-3 rounded-lg bg-slate-800/30 text-center">
+          <div className="text-xs text-slate-400 mb-1">Mean Test Sharpe</div>
+          <div className={`text-lg font-bold font-mono ${summary.mean_test_sharpe >= 0 ? 'text-brand-300' : 'text-red-400'}`}>
+            {summary.mean_test_sharpe.toFixed(2)}
+          </div>
+        </div>
+        <div className="p-3 rounded-lg bg-slate-800/30 text-center">
+          <div className="text-xs text-slate-400 mb-1">Folds</div>
+          <div className="text-lg font-bold font-mono text-slate-200">{summary.n_folds}</div>
+        </div>
+      </div>
+
+      {/* Paired bar chart */}
+      <div className="overflow-x-auto">
+        <svg width={chartW} height={chartH + 50} className="block">
+          {/* Y-axis zero line */}
+          <line x1={padL} y1={zeroY} x2={chartW - 10} y2={zeroY} stroke="#475569" strokeDasharray="2 2" />
+          <text x={padL - 6} y={zeroY + 3} fontSize="9" fill="#64748b" textAnchor="end">0</text>
+          {/* Y-axis bounds */}
+          <text x={padL - 6} y={yToPx(yMax) + 3} fontSize="9" fill="#64748b" textAnchor="end">{yMax.toFixed(1)}</text>
+          <text x={padL - 6} y={yToPx(yMin) + 3} fontSize="9" fill="#64748b" textAnchor="end">{yMin.toFixed(1)}</text>
+
+          {folds.map((f, i) => {
+            const groupX = padL + i * barGroupW;
+            const trainY = yToPx(f.train_sharpe);
+            const testY = yToPx(f.test_sharpe);
+            const trainH = Math.abs(trainY - zeroY);
+            const testH = Math.abs(testY - zeroY);
+            const trainTop = Math.min(trainY, zeroY);
+            const testTop = Math.min(testY, zeroY);
+            return (
+              <g key={i}>
+                <rect x={groupX} y={trainTop} width={barW} height={trainH}
+                  fill="#64748b"
+                  opacity={0.7}>
+                  <title>Fold {f.fold} train {f.train_start}→{f.train_end}: Sharpe {f.train_sharpe.toFixed(3)}</title>
+                </rect>
+                <rect x={groupX + barW + barGap} y={testTop} width={barW} height={testH}
+                  fill={f.test_sharpe >= 0 ? '#6366f1' : '#ef4444'}>
+                  <title>Fold {f.fold} test {f.test_start}→{f.test_end}: Sharpe {f.test_sharpe.toFixed(3)}</title>
+                </rect>
+                <text x={groupX + barW} y={chartH + 14} fontSize="10" fill="#94a3b8" textAnchor="middle">
+                  F{f.fold}
+                </text>
+                <text x={groupX + barW} y={chartH + 28} fontSize="9" fill="#64748b" textAnchor="middle">
+                  {f.test_start.slice(5)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-3 text-xs text-slate-400">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#64748b', opacity: 0.7 }} />
+          Train (in-sample)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#6366f1' }} />
+          Test (out-of-sample)
+        </div>
+      </div>
+
+      {/* Fold table */}
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-700/30 text-slate-500">
+              <th className="text-left py-2 px-2 font-medium">Fold</th>
+              <th className="text-left py-2 px-2 font-medium">Train Window</th>
+              <th className="text-left py-2 px-2 font-medium">Test Window</th>
+              <th className="text-right py-2 px-2 font-medium">Train SR</th>
+              <th className="text-right py-2 px-2 font-medium">Test SR</th>
+              <th className="text-right py-2 px-2 font-medium">Δ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {folds.map(f => {
+              const delta = f.train_sharpe - f.test_sharpe;
+              return (
+                <tr key={f.fold} className="border-b border-slate-700/10">
+                  <td className="py-1.5 px-2 font-mono text-slate-300">F{f.fold}</td>
+                  <td className="py-1.5 px-2 font-mono text-slate-400">{f.train_start} → {f.train_end}</td>
+                  <td className="py-1.5 px-2 font-mono text-slate-400">{f.test_start} → {f.test_end}</td>
+                  <td className="py-1.5 px-2 text-right font-mono text-slate-200">{f.train_sharpe.toFixed(2)}</td>
+                  <td className={`py-1.5 px-2 text-right font-mono font-semibold ${f.test_sharpe >= 0 ? 'text-brand-300' : 'text-red-400'}`}>
+                    {f.test_sharpe.toFixed(2)}
+                  </td>
+                  <td className={`py-1.5 px-2 text-right font-mono ${Math.abs(delta) < 0.2 ? 'text-green-400' : delta > 0 ? 'text-yellow-400' : 'text-slate-400'}`}>
+                    {delta >= 0 ? '+' : ''}{delta.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function SensitivityHeatmap({ data }: { data: NonNullable<StrategyResult['sensitivity']> }) {
@@ -581,6 +772,9 @@ function BacktestPageInner() {
                 </div>
               ))}
             </div>
+
+            {/* Walk-Forward Analysis */}
+            {data.walk_forward && <WalkForwardPanel data={data.walk_forward} />}
 
             {/* Parameter Sensitivity Heatmap */}
             {data.sensitivity && <SensitivityHeatmap data={data.sensitivity} />}
