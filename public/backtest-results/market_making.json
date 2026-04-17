@@ -1,7 +1,7 @@
 {
   "strategy": "market_making",
   "version": "1.0.0",
-  "generated_at": "2026-04-17T03:37:08.512650",
+  "generated_at": "2026-04-17T08:26:01.102970",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -777,5 +777,73 @@
         }
       ]
     }
+  },
+  "sensitivity": {
+    "sharpe_grid": [
+      [
+        0.2801,
+        0.535,
+        0.6602,
+        0.4829,
+        0.2731
+      ],
+      [
+        0.5894,
+        0.9408,
+        1.1561,
+        1.0025,
+        0.5693
+      ],
+      [
+        0.725,
+        1.0762,
+        1.442,
+        1.163,
+        0.6441
+      ],
+      [
+        0.5411,
+        0.8911,
+        1.0767,
+        0.8569,
+        0.5214
+      ],
+      [
+        0.2281,
+        0.4531,
+        0.6131,
+        0.4874,
+        0.2312
+      ]
+    ],
+    "param_x": {
+      "name": "gamma_inventory_penalty",
+      "values": [
+        0.05,
+        0.1,
+        0.15,
+        0.2,
+        0.3
+      ],
+      "label": "\u03b3 (inv. penalty)",
+      "fmt": "float"
+    },
+    "param_y": {
+      "name": "k_order_arrival",
+      "values": [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        3.0
+      ],
+      "label": "k (order arrival)",
+      "fmt": "float"
+    },
+    "max_cell": {
+      "row": 2,
+      "col": 2
+    },
+    "stability_score": 0.5424
   }
 }

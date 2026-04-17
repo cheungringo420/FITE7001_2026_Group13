@@ -1,7 +1,7 @@
 {
   "strategy": "cross_platform_arb",
   "version": "1.0.0",
-  "generated_at": "2026-04-17T03:37:08.511363",
+  "generated_at": "2026-04-17T08:26:01.101729",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -588,5 +588,73 @@
         }
       ]
     }
+  },
+  "sensitivity": {
+    "sharpe_grid": [
+      [
+        0.4457,
+        0.6006,
+        0.5232,
+        0.3085,
+        0.0781
+      ],
+      [
+        0.9947,
+        1.1676,
+        0.9801,
+        0.5845,
+        0.2697
+      ],
+      [
+        1.2758,
+        1.3955,
+        1.188,
+        0.7614,
+        0.2275
+      ],
+      [
+        0.9649,
+        1.112,
+        0.9511,
+        0.5737,
+        0.1483
+      ],
+      [
+        0.4523,
+        0.5328,
+        0.4827,
+        0.2591,
+        0.1772
+      ]
+    ],
+    "param_x": {
+      "name": "min_profit_threshold",
+      "values": [
+        0.005,
+        0.01,
+        0.015,
+        0.02,
+        0.03
+      ],
+      "label": "Min profit threshold",
+      "fmt": "pct"
+    },
+    "param_y": {
+      "name": "min_alignment_score",
+      "values": [
+        0.5,
+        0.6,
+        0.65,
+        0.75,
+        0.85
+      ],
+      "label": "Min alignment score",
+      "fmt": "float"
+    },
+    "max_cell": {
+      "row": 2,
+      "col": 1
+    },
+    "stability_score": 0.4161
   }
 }

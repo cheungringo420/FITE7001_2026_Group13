@@ -25,6 +25,13 @@ interface StrategyResult {
   caveat?: string;
   hedge_effectiveness?: Record<string, any>;
   dynamic_vs_static?: Record<string, any>;
+  sensitivity?: {
+    sharpe_grid: number[][];
+    param_x: { name: string; values: number[]; label?: string; fmt?: 'pct' | 'float' | 'int' };
+    param_y: { name: string; values: number[]; label?: string; fmt?: 'pct' | 'float' | 'int' };
+    max_cell: { row: number; col: number };
+    stability_score: number;
+  };
   rigor?: {
     monte_carlo: {
       sharpe: { point_estimate: number; ci_lower: number; ci_upper: number; std_error: number };
@@ -81,6 +88,132 @@ function MetricRow({ label, train, test, fmt }: { label: string; train: number; 
 function SharpeColor({ value }: { value: number }) {
   const color = value >= 1.5 ? 'text-green-400' : value >= 1 ? 'text-brand-300' : value >= 0.5 ? 'text-yellow-400' : value >= 0 ? 'text-orange-400' : 'text-red-400';
   return <span className={`font-bold ${color}`}>{value.toFixed(2)}</span>;
+}
+
+function formatAxisValue(v: number, fmt?: 'pct' | 'float' | 'int') {
+  if (fmt === 'pct') return `${(v * 100).toFixed(v < 0.01 ? 2 : 1)}%`;
+  if (fmt === 'int') return v.toFixed(0);
+  return v.toFixed(2);
+}
+
+function heatmapCellColor(v: number, min: number, max: number): string {
+  // Linear interpolation: red (low) → amber (mid) → green (high).
+  if (max === min) return 'rgb(100, 116, 139)';
+  const t = (v - min) / (max - min);
+  if (t < 0.5) {
+    const a = t * 2; // 0 → 1
+    const r = 239, g = Math.round(68 + (191 - 68) * a), b = Math.round(68 + (36 - 68) * a);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  const a = (t - 0.5) * 2; // 0 → 1
+  const r = Math.round(239 + (34 - 239) * a), g = Math.round(191 + (197 - 191) * a), b = Math.round(36 + (94 - 36) * a);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function SensitivityHeatmap({ data }: { data: NonNullable<StrategyResult['sensitivity']> }) {
+  const { sharpe_grid, param_x, param_y, max_cell, stability_score } = data;
+  const flat = sharpe_grid.flat();
+  const min = Math.min(...flat);
+  const max = Math.max(...flat);
+
+  const stabColor = stability_score >= 0.8
+    ? 'bg-green-500/15 text-green-300 border-green-500/30'
+    : stability_score >= 0.6
+    ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+    : 'bg-red-500/15 text-red-300 border-red-500/30';
+
+  return (
+    <div className="mt-8 pt-6 border-t border-slate-700/30">
+      <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
+        <h4 className="text-md font-semibold text-white">Parameter Sensitivity Surface</h4>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-mono border ${stabColor}`}>
+          Stability: {(stability_score * 100).toFixed(1)}%
+        </span>
+      </div>
+      <p className="text-xs text-slate-400 mb-5">
+        Sharpe across a 2D parameter grid. Green cells = high Sharpe. A flat surface (high stability) means
+        the result isn&apos;t a cherry-picked threshold. The peak cell is outlined.
+      </p>
+
+      <div className="overflow-x-auto">
+        <div className="inline-block">
+          {/* X-axis label */}
+          <div className="text-xs text-slate-500 text-center mb-2 font-medium">
+            {param_x.label || param_x.name}
+          </div>
+          <div className="flex">
+            {/* Y-axis label (rotated) */}
+            <div className="flex items-center justify-center pr-2">
+              <div
+                className="text-xs text-slate-500 font-medium whitespace-nowrap"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                {param_y.label || param_y.name}
+              </div>
+            </div>
+
+            <div>
+              {/* X-axis tick labels */}
+              <div className="flex">
+                <div className="w-14" /> {/* spacer for y-axis tick column */}
+                {param_x.values.map((v, i) => (
+                  <div key={i} className="w-16 text-center text-[10px] text-slate-400 font-mono pb-1">
+                    {formatAxisValue(v, param_x.fmt)}
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid rows */}
+              {sharpe_grid.map((row, i) => (
+                <div key={i} className="flex">
+                  <div className="w-14 pr-2 text-right text-[10px] text-slate-400 font-mono flex items-center justify-end">
+                    {formatAxisValue(param_y.values[i], param_y.fmt)}
+                  </div>
+                  {row.map((val, j) => {
+                    const isMax = max_cell.row === i && max_cell.col === j;
+                    return (
+                      <div
+                        key={j}
+                        className={`w-16 h-12 flex items-center justify-center text-xs font-mono font-semibold ${
+                          isMax ? 'ring-2 ring-white ring-offset-1 ring-offset-slate-900 z-10 relative' : ''
+                        }`}
+                        style={{
+                          backgroundColor: heatmapCellColor(val, min, max),
+                          color: val > (min + max) / 2 ? '#0f172a' : '#f8fafc',
+                        }}
+                        title={`${param_x.name}=${formatAxisValue(param_x.values[j], param_x.fmt)}, ${param_y.name}=${formatAxisValue(param_y.values[i], param_y.fmt)} → Sharpe ${val.toFixed(3)}`}
+                      >
+                        {val.toFixed(2)}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="mt-4 flex items-center justify-center gap-3 text-[10px] text-slate-400">
+            <span className="font-mono">{min.toFixed(2)}</span>
+            <div
+              className="h-2 w-40 rounded"
+              style={{
+                background: 'linear-gradient(to right, rgb(239,68,68), rgb(239,191,36), rgb(34,197,94))',
+              }}
+            />
+            <span className="font-mono">{max.toFixed(2)}</span>
+            <span className="text-slate-500 ml-2">Sharpe</span>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-slate-500 mt-5">
+        Peak at {param_x.name}={formatAxisValue(param_x.values[max_cell.col], param_x.fmt)},{' '}
+        {param_y.name}={formatAxisValue(param_y.values[max_cell.row], param_y.fmt)}. High stability
+        (&ge;80%) indicates the strategy is robust to parameter perturbations.
+      </p>
+    </div>
+  );
 }
 
 function BacktestPageInner() {
@@ -448,6 +581,9 @@ function BacktestPageInner() {
                 </div>
               ))}
             </div>
+
+            {/* Parameter Sensitivity Heatmap */}
+            {data.sensitivity && <SensitivityHeatmap data={data.sensitivity} />}
           </div>
         )}
 

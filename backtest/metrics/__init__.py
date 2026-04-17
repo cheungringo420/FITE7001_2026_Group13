@@ -8,3 +8,4 @@ from .deflated_sharpe import (
     expected_max_sharpe,
 )
 from .regime_analysis import performance_by_regime
+from .sensitivity import SensitivityAnalyzer
