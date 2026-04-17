@@ -1,7 +1,7 @@
 {
   "type": "portfolio_summary",
   "version": "1.0.0",
-  "generated_at": "2026-04-17T08:26:01.103371",
+  "generated_at": "2026-04-17T08:32:11.141404",
   "portfolio_metrics": {
     "sharpe": 1.65,
     "sortino": 2.12,
@@ -67,43 +67,161 @@
   "correlation_matrix": {
     "cross_platform_arb": {
       "cross_platform_arb": 1.0,
-      "lead_lag_vol": 0.12,
-      "insurance_overlay": -0.08,
-      "dynamic_hedge": -0.05,
-      "market_making": 0.15
+      "lead_lag_vol": -0.0485,
+      "insurance_overlay": -0.0265,
+      "dynamic_hedge": -0.0722,
+      "mean_reversion": -0.0319,
+      "market_making": -0.2676
     },
     "lead_lag_vol": {
-      "cross_platform_arb": 0.12,
+      "cross_platform_arb": -0.0485,
       "lead_lag_vol": 1.0,
-      "insurance_overlay": 0.22,
-      "dynamic_hedge": 0.18,
-      "market_making": 0.05
+      "insurance_overlay": -0.1691,
+      "dynamic_hedge": 0.1982,
+      "mean_reversion": 0.0074,
+      "market_making": 0.127
     },
     "insurance_overlay": {
-      "cross_platform_arb": -0.08,
-      "lead_lag_vol": 0.22,
+      "cross_platform_arb": -0.0265,
+      "lead_lag_vol": -0.1691,
       "insurance_overlay": 1.0,
-      "dynamic_hedge": 0.45,
-      "market_making": -0.02
+      "dynamic_hedge": 0.0745,
+      "mean_reversion": -0.0397,
+      "market_making": -0.1368
     },
     "dynamic_hedge": {
-      "cross_platform_arb": -0.05,
-      "lead_lag_vol": 0.18,
-      "insurance_overlay": 0.45,
+      "cross_platform_arb": -0.0722,
+      "lead_lag_vol": 0.1982,
+      "insurance_overlay": 0.0745,
       "dynamic_hedge": 1.0,
-      "market_making": -0.01
+      "mean_reversion": -0.0758,
+      "market_making": 0.1696
+    },
+    "mean_reversion": {
+      "cross_platform_arb": -0.0319,
+      "lead_lag_vol": 0.0074,
+      "insurance_overlay": -0.0397,
+      "dynamic_hedge": -0.0758,
+      "mean_reversion": 1.0,
+      "market_making": -0.1229
     },
     "market_making": {
-      "cross_platform_arb": 0.15,
-      "lead_lag_vol": 0.05,
-      "insurance_overlay": -0.02,
-      "dynamic_hedge": -0.01,
+      "cross_platform_arb": -0.2676,
+      "lead_lag_vol": 0.127,
+      "insurance_overlay": -0.1368,
+      "dynamic_hedge": 0.1696,
+      "mean_reversion": -0.1229,
       "market_making": 1.0
     }
   },
   "diversification_benefit": {
-    "avg_pairwise_correlation": 0.098,
+    "avg_pairwise_correlation": -0.0276,
     "portfolio_vol_reduction_vs_avg": 0.35,
     "note": "Low correlations between strategies provide significant diversification benefit"
+  },
+  "construction_comparison": {
+    "strategy_names": [
+      "cross_platform_arb",
+      "lead_lag_vol",
+      "insurance_overlay",
+      "dynamic_hedge",
+      "mean_reversion",
+      "market_making"
+    ],
+    "methods": {
+      "equal_weight": {
+        "weights": {
+          "cross_platform_arb": 0.16666666666666666,
+          "lead_lag_vol": 0.16666666666666666,
+          "insurance_overlay": 0.16666666666666666,
+          "dynamic_hedge": 0.16666666666666666,
+          "mean_reversion": 0.16666666666666666,
+          "market_making": 0.16666666666666666
+        },
+        "sharpe": 5.0891,
+        "ann_return": 0.317728,
+        "ann_vol": 0.062432,
+        "max_drawdown": -0.010401
+      },
+      "risk_parity": {
+        "weights": {
+          "cross_platform_arb": 0.10918488057104038,
+          "lead_lag_vol": 0.04920046976533528,
+          "insurance_overlay": 0.16732929018024936,
+          "dynamic_hedge": 0.16562175276363916,
+          "mean_reversion": 0.28813061586144173,
+          "market_making": 0.22053299085829403
+        },
+        "sharpe": 6.2233,
+        "ann_return": 0.234812,
+        "ann_vol": 0.037731,
+        "max_drawdown": -0.005399
+      },
+      "mean_variance": {
+        "weights": {
+          "cross_platform_arb": 0.1883608136850797,
+          "lead_lag_vol": 0.01730124190440478,
+          "insurance_overlay": 0.31368111670794224,
+          "dynamic_hedge": 0.40459030915617766,
+          "mean_reversion": 9.607894720705529e-18,
+          "market_making": 0.07606651854639566
+        },
+        "sharpe": 8.7099,
+        "ann_return": 0.4963,
+        "ann_vol": 0.056981,
+        "max_drawdown": -0.007611
+      }
+    },
+    "correlation_matrix": {
+      "cross_platform_arb": {
+        "cross_platform_arb": 1.0,
+        "lead_lag_vol": -0.0485,
+        "insurance_overlay": -0.0265,
+        "dynamic_hedge": -0.0722,
+        "mean_reversion": -0.0319,
+        "market_making": -0.2676
+      },
+      "lead_lag_vol": {
+        "cross_platform_arb": -0.0485,
+        "lead_lag_vol": 1.0,
+        "insurance_overlay": -0.1691,
+        "dynamic_hedge": 0.1982,
+        "mean_reversion": 0.0074,
+        "market_making": 0.127
+      },
+      "insurance_overlay": {
+        "cross_platform_arb": -0.0265,
+        "lead_lag_vol": -0.1691,
+        "insurance_overlay": 1.0,
+        "dynamic_hedge": 0.0745,
+        "mean_reversion": -0.0397,
+        "market_making": -0.1368
+      },
+      "dynamic_hedge": {
+        "cross_platform_arb": -0.0722,
+        "lead_lag_vol": 0.1982,
+        "insurance_overlay": 0.0745,
+        "dynamic_hedge": 1.0,
+        "mean_reversion": -0.0758,
+        "market_making": 0.1696
+      },
+      "mean_reversion": {
+        "cross_platform_arb": -0.0319,
+        "lead_lag_vol": 0.0074,
+        "insurance_overlay": -0.0397,
+        "dynamic_hedge": -0.0758,
+        "mean_reversion": 1.0,
+        "market_making": -0.1229
+      },
+      "market_making": {
+        "cross_platform_arb": -0.2676,
+        "lead_lag_vol": 0.127,
+        "insurance_overlay": -0.1368,
+        "dynamic_hedge": 0.1696,
+        "mean_reversion": -0.1229,
+        "market_making": 1.0
+      }
+    },
+    "avg_pairwise_correlation": -0.0276
   }
 }

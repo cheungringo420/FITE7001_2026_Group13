@@ -18,6 +18,7 @@ from backtest.metrics.deflated_sharpe import (
 from backtest.engine.regime import VolatilityRegimeDetector
 from backtest.metrics.regime_analysis import performance_by_regime
 from backtest.metrics.sensitivity import SensitivityAnalyzer
+from backtest.metrics.portfolio_comparison import PortfolioComparison
 
 OUTPUT_DIR = Path(__file__).parent.parent / "public" / "backtest-results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -568,6 +569,30 @@ for idx, s in enumerate(strategies):
             optimal_y_idx=opt_y,
             seed=100 + idx,
         )
+
+# ─── Portfolio Construction Comparison (equal/RP/MV) ────────────────
+# Extract daily OOS returns from each strategy's equity curve and run the
+# three construction methods on the common-date panel. This is what the
+# /research/portfolio page renders as the head-to-head comparison.
+
+_strategy_returns = {}
+for s in strategies:
+    eq_curve = s["equity_curve"]
+    if len(eq_curve) < 2:
+        continue
+    eq = np.array([pt["value"] for pt in eq_curve], dtype=float)
+    rets = np.diff(eq) / eq[:-1]
+    dates = pd.to_datetime([pt["date"] for pt in eq_curve[1:]])
+    _strategy_returns[s["strategy"]] = pd.Series(rets, index=dates)
+
+_comparison = PortfolioComparison().compare(_strategy_returns)
+portfolio_summary["construction_comparison"] = _comparison
+# Refresh correlation matrix with the one computed from actual returns so the
+# summary page and the comparison page agree.
+portfolio_summary["correlation_matrix"] = _comparison["correlation_matrix"]
+portfolio_summary["diversification_benefit"]["avg_pairwise_correlation"] = (
+    _comparison["avg_pairwise_correlation"]
+)
 
 # ─── Write all files ────────────────────────────────────────────────
 
