@@ -1,7 +1,7 @@
 {
   "strategy": "dynamic_hedge",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.990792",
+  "generated_at": "2026-04-17T03:37:08.512067",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -469,5 +469,62 @@
     "static_sharpe": 0.31,
     "carry_cost_saved_pct": 0.042,
     "drawdown_improvement": 0.018
+  },
+  "rigor": {
+    "monte_carlo": {
+      "sharpe": {
+        "point_estimate": 5.133633,
+        "ci_lower": 1.101361,
+        "ci_upper": 8.223865,
+        "std_error": 1.771547
+      },
+      "max_drawdown": {
+        "point_estimate": -0.014422,
+        "ci_lower": -0.027614,
+        "ci_upper": -0.0087,
+        "std_error": 0.005179
+      },
+      "ann_return": {
+        "point_estimate": 0.487616,
+        "ci_lower": 0.072313,
+        "ci_upper": 0.99128,
+        "std_error": 0.22936
+      },
+      "n_simulations": 500,
+      "method": "block",
+      "block_size": 5
+    },
+    "deflated_sharpe": {
+      "psr": 0.9927,
+      "dsr": 0.0002,
+      "n_trials": 6,
+      "trial_sharpe_variance": 0.364627
+    },
+    "regime_analysis": {
+      "regime_names": {
+        "0": "low_vol",
+        "1": "high_vol"
+      },
+      "table": [
+        {
+          "regime": "low_vol",
+          "label": 0,
+          "n_days": 29,
+          "sharpe": 8.9453,
+          "ann_return": 0.638773,
+          "ann_vol": 0.071409,
+          "max_drawdown": -0.009264
+        },
+        {
+          "regime": "high_vol",
+          "label": 1,
+          "n_days": 25,
+          "sharpe": 3.8862,
+          "ann_return": 0.329591,
+          "ann_vol": 0.08481,
+          "max_drawdown": -0.014301
+        }
+      ]
+    }
   }
 }

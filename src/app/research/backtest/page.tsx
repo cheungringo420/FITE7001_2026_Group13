@@ -25,6 +25,34 @@ interface StrategyResult {
   caveat?: string;
   hedge_effectiveness?: Record<string, any>;
   dynamic_vs_static?: Record<string, any>;
+  rigor?: {
+    monte_carlo: {
+      sharpe: { point_estimate: number; ci_lower: number; ci_upper: number; std_error: number };
+      max_drawdown: { point_estimate: number; ci_lower: number; ci_upper: number; std_error: number };
+      ann_return: { point_estimate: number; ci_lower: number; ci_upper: number; std_error: number };
+      n_simulations: number;
+      method: string;
+      block_size: number | null;
+    };
+    deflated_sharpe: {
+      psr: number | null;
+      dsr: number | null;
+      n_trials: number;
+      trial_sharpe_variance: number;
+    };
+    regime_analysis: {
+      regime_names: Record<string, string>;
+      table: Array<{
+        regime: string;
+        label: number;
+        n_days: number;
+        sharpe: number;
+        ann_return: number;
+        ann_vol: number;
+        max_drawdown: number;
+      }>;
+    };
+  };
 }
 
 const STRATEGY_NAMES: Record<string, string> = {
@@ -62,7 +90,7 @@ function BacktestPageInner() {
   const [selected, setSelected] = useState(initialStrategy);
   const [data, setData] = useState<StrategyResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'equity' | 'factors' | 'robustness' | 'events'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'equity' | 'factors' | 'robustness' | 'events' | 'rigor'>('overview');
 
   useEffect(() => {
     setLoading(true);
@@ -152,7 +180,7 @@ function BacktestPageInner() {
 
         {/* Tab nav */}
         <div className="flex gap-1 mb-6 border-b border-slate-800/50">
-          {(['overview', 'equity', 'factors', 'robustness', 'events'] as const).map(tab => (
+          {(['overview', 'equity', 'factors', 'robustness', 'events', 'rigor'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -420,6 +448,144 @@ function BacktestPageInner() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Rigor Tab — Monte Carlo, DSR, regime analysis */}
+        {activeTab === 'rigor' && (
+          <div className="space-y-6">
+            {!data.rigor ? (
+              <div className="glass-strong rounded-xl p-6">
+                <p className="text-slate-400 text-sm">
+                  Rigor metrics not available for this strategy. Re-run{' '}
+                  <code className="text-brand-300">python -m backtest.generate_sample_results</code>{' '}
+                  to include Monte Carlo CIs, Deflated Sharpe Ratio, and regime analysis.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Monte Carlo Bootstrap */}
+                <div className="glass-strong rounded-xl p-6">
+                  <div className="flex items-baseline justify-between mb-1">
+                    <h3 className="text-lg font-semibold text-white">Monte Carlo Bootstrap (95% CI)</h3>
+                    <span className="text-xs text-slate-500 font-mono">
+                      {data.rigor.monte_carlo.n_simulations} sims · {data.rigor.monte_carlo.method}
+                      {data.rigor.monte_carlo.block_size ? ` · block=${data.rigor.monte_carlo.block_size}` : ''}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-5">
+                    Resampled performance distribution from the out-of-sample returns. CI widths indicate the precision of each point estimate.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {([
+                      ['Sharpe', data.rigor.monte_carlo.sharpe, (v: number) => v.toFixed(2)],
+                      ['Max Drawdown', data.rigor.monte_carlo.max_drawdown, (v: number) => `${(v * 100).toFixed(2)}%`],
+                      ['Ann. Return', data.rigor.monte_carlo.ann_return, (v: number) => `${(v * 100).toFixed(2)}%`],
+                    ] as const).map(([label, m, fmt]) => (
+                      <div key={label} className="p-4 rounded-xl bg-slate-800/30">
+                        <div className="text-xs text-slate-400 mb-1">{label}</div>
+                        <div className="text-2xl font-bold font-mono text-white">{fmt(m.point_estimate)}</div>
+                        <div className="mt-2 flex items-center justify-between text-xs">
+                          <span className="text-slate-500">95% CI</span>
+                          <span className="font-mono text-slate-300">
+                            [{fmt(m.ci_lower)}, {fmt(m.ci_upper)}]
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Std Error</span>
+                          <span className="font-mono text-slate-400">{fmt(m.std_error)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Deflated Sharpe Ratio */}
+                <div className="glass-strong rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-1">Deflated Sharpe Ratio</h3>
+                  <p className="text-xs text-slate-400 mb-5">
+                    Bailey &amp; López de Prado (2014). PSR corrects for non-normal returns; DSR additionally deflates for
+                    multiple testing across the {data.rigor.deflated_sharpe.n_trials} evaluated strategies.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-800/30 text-center">
+                      <div className="text-xs text-slate-400 mb-1">PSR (vs SR = 0)</div>
+                      <div className={`text-3xl font-bold font-mono ${
+                        (data.rigor.deflated_sharpe.psr ?? 0) >= 0.95 ? 'text-green-400' :
+                        (data.rigor.deflated_sharpe.psr ?? 0) >= 0.80 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {data.rigor.deflated_sharpe.psr !== null ? (data.rigor.deflated_sharpe.psr * 100).toFixed(1) + '%' : 'N/A'}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-2">Prob. true Sharpe &gt; 0</div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-800/30 text-center">
+                      <div className="text-xs text-slate-400 mb-1">DSR (multi-test deflated)</div>
+                      <div className={`text-3xl font-bold font-mono ${
+                        (data.rigor.deflated_sharpe.dsr ?? 0) >= 0.95 ? 'text-green-400' :
+                        (data.rigor.deflated_sharpe.dsr ?? 0) >= 0.80 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {data.rigor.deflated_sharpe.dsr !== null ? (data.rigor.deflated_sharpe.dsr * 100).toFixed(1) + '%' : 'N/A'}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-2">
+                        Prob. beats max-of-{data.rigor.deflated_sharpe.n_trials} null Sharpe
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-500">
+                    Trial-Sharpe variance across all {data.rigor.deflated_sharpe.n_trials} strategies:{' '}
+                    <span className="font-mono text-slate-400">
+                      {data.rigor.deflated_sharpe.trial_sharpe_variance.toFixed(4)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Regime Analysis */}
+                <div className="glass-strong rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-1">Performance by Volatility Regime</h3>
+                  <p className="text-xs text-slate-400 mb-5">
+                    Rolling-vol quantile regimes. Reveals whether strategy performance is regime-dependent or robust across conditions.
+                  </p>
+                  {data.rigor.regime_analysis.table.length === 0 ? (
+                    <p className="text-sm text-slate-400">Insufficient data for regime analysis.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-700/30">
+                          <th className="py-2 px-3 text-left text-slate-500 text-xs">Regime</th>
+                          <th className="py-2 px-3 text-right text-slate-500 text-xs">Days</th>
+                          <th className="py-2 px-3 text-right text-slate-500 text-xs">Sharpe</th>
+                          <th className="py-2 px-3 text-right text-slate-500 text-xs">Ann. Return</th>
+                          <th className="py-2 px-3 text-right text-slate-500 text-xs">Ann. Vol</th>
+                          <th className="py-2 px-3 text-right text-slate-500 text-xs">Max DD</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.rigor.regime_analysis.table.map(row => (
+                          <tr key={row.label} className="border-b border-slate-700/10">
+                            <td className="py-2 px-3">
+                              <span className={`px-2 py-0.5 rounded text-xs font-mono ${
+                                row.regime === 'low_vol' ? 'bg-green-500/10 text-green-300' :
+                                row.regime === 'high_vol' ? 'bg-red-500/10 text-red-300' :
+                                'bg-slate-500/10 text-slate-300'
+                              }`}>
+                                {row.regime}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-300">{row.n_days}</td>
+                            <td className="py-2 px-3 text-right"><SharpeColor value={row.sharpe} /></td>
+                            <td className={`py-2 px-3 text-right font-mono ${row.ann_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {(row.ann_return * 100).toFixed(2)}%
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-300">{(row.ann_vol * 100).toFixed(2)}%</td>
+                            <td className="py-2 px-3 text-right font-mono text-red-400">{(row.max_drawdown * 100).toFixed(2)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 

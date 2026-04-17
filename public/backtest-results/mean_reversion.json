@@ -1,7 +1,7 @@
 {
   "strategy": "mean_reversion",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.991419",
+  "generated_at": "2026-04-17T03:37:08.512357",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -528,5 +528,62 @@
     "ratio": null,
     "flagged": false
   },
-  "honest_finding": "Transaction costs consume the entire mispricing margin. This validates Polymarket's pricing efficiency \u2014 the market is well-arbitraged within single-platform bounds. Academically valuable null result."
+  "honest_finding": "Transaction costs consume the entire mispricing margin. This validates Polymarket's pricing efficiency \u2014 the market is well-arbitraged within single-platform bounds. Academically valuable null result.",
+  "rigor": {
+    "monte_carlo": {
+      "sharpe": {
+        "point_estimate": -1.276205,
+        "ci_lower": -5.887187,
+        "ci_upper": 2.826175,
+        "std_error": 2.152686
+      },
+      "max_drawdown": {
+        "point_estimate": -0.022093,
+        "ci_lower": -0.064418,
+        "ci_upper": -0.013634,
+        "std_error": 0.013791
+      },
+      "ann_return": {
+        "point_estimate": -0.075496,
+        "ci_lower": -0.24348,
+        "ci_upper": 0.222862,
+        "std_error": 0.116093
+      },
+      "n_simulations": 500,
+      "method": "block",
+      "block_size": 5
+    },
+    "deflated_sharpe": {
+      "psr": 0.2899,
+      "dsr": 0.0,
+      "n_trials": 6,
+      "trial_sharpe_variance": 0.364627
+    },
+    "regime_analysis": {
+      "regime_names": {
+        "0": "low_vol",
+        "1": "high_vol"
+      },
+      "table": [
+        {
+          "regime": "low_vol",
+          "label": 0,
+          "n_days": 25,
+          "sharpe": -2.747,
+          "ann_return": -0.122139,
+          "ann_vol": 0.044464,
+          "max_drawdown": -0.02099
+        },
+        {
+          "regime": "high_vol",
+          "label": 1,
+          "n_days": 29,
+          "sharpe": -0.4513,
+          "ann_return": -0.03331,
+          "ann_vol": 0.073803,
+          "max_drawdown": -0.016399
+        }
+      ]
+    }
+  }
 }

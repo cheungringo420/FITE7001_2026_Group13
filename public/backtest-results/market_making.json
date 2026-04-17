@@ -1,7 +1,7 @@
 {
   "strategy": "market_making",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.993086",
+  "generated_at": "2026-04-17T03:37:08.512650",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -720,5 +720,62 @@
     "ratio": 0.943,
     "flagged": false
   },
-  "caveat": "Market-making PnL estimates are lower-bounded approximations due to top-of-book data only. Actual execution depends on real-time order flow and queue position. Results should be interpreted as indicative, not executable."
+  "caveat": "Market-making PnL estimates are lower-bounded approximations due to top-of-book data only. Actual execution depends on real-time order flow and queue position. Results should be interpreted as indicative, not executable.",
+  "rigor": {
+    "monte_carlo": {
+      "sharpe": {
+        "point_estimate": -0.210339,
+        "ci_lower": -4.518428,
+        "ci_upper": 3.78936,
+        "std_error": 2.242764
+      },
+      "max_drawdown": {
+        "point_estimate": -0.043215,
+        "ci_lower": -0.085775,
+        "ci_upper": -0.016922,
+        "std_error": 0.018606
+      },
+      "ann_return": {
+        "point_estimate": -0.017895,
+        "ci_lower": -0.319313,
+        "ci_upper": 0.362402,
+        "std_error": 0.182553
+      },
+      "n_simulations": 500,
+      "method": "block",
+      "block_size": 5
+    },
+    "deflated_sharpe": {
+      "psr": 0.4616,
+      "dsr": 0.0,
+      "n_trials": 6,
+      "trial_sharpe_variance": 0.364627
+    },
+    "regime_analysis": {
+      "regime_names": {
+        "0": "low_vol",
+        "1": "high_vol"
+      },
+      "table": [
+        {
+          "regime": "low_vol",
+          "label": 0,
+          "n_days": 25,
+          "sharpe": -2.4018,
+          "ann_return": -0.157571,
+          "ann_vol": 0.065606,
+          "max_drawdown": -0.027001
+        },
+        {
+          "regime": "high_vol",
+          "label": 1,
+          "n_days": 29,
+          "sharpe": 1.2026,
+          "ann_return": 0.120884,
+          "ann_vol": 0.100519,
+          "max_drawdown": -0.025817
+        }
+      ]
+    }
+  }
 }

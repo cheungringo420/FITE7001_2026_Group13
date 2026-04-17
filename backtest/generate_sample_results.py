@@ -6,13 +6,57 @@ Run: python -m backtest.generate_sample_results
 
 import json
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
+
+from backtest.metrics.monte_carlo import MonteCarloAnalysis
+from backtest.metrics.deflated_sharpe import (
+    deflated_sharpe_ratio,
+    probabilistic_sharpe_ratio,
+)
+from backtest.engine.regime import VolatilityRegimeDetector
+from backtest.metrics.regime_analysis import performance_by_regime
 
 OUTPUT_DIR = Path(__file__).parent.parent / "public" / "backtest-results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 np.random.seed(42)
+
+
+def compute_rigor_metrics(returns_array, dates, trial_sharpes, n_trials=6, seed=0):
+    """Compute MC bootstrap CIs, DSR/PSR, and regime analysis for a returns series."""
+    r_series = pd.Series(returns_array, index=pd.to_datetime(dates))
+    mc = MonteCarloAnalysis(n_simulations=500, seed=seed, ci=0.95)
+    ci = mc.bootstrap_all(r_series, method="block", block_size=5)
+
+    trial_var = float(np.var(trial_sharpes, ddof=1)) if len(trial_sharpes) > 1 else 0.1
+    psr = probabilistic_sharpe_ratio(r_series, sharpe_benchmark=0.0)
+    dsr = deflated_sharpe_ratio(r_series, n_trials=n_trials, trial_sharpe_variance=trial_var)
+
+    regime_payload = {"table": [], "regime_names": {}}
+    if len(r_series) >= 30:
+        det = VolatilityRegimeDetector(lookback=10, n_regimes=2)
+        labels = det.fit_transform(r_series)
+        reg_table = performance_by_regime(r_series, labels, regime_names=det.regime_names())
+        regime_payload = {
+            "regime_names": det.regime_names(),
+            "table": [
+                {"regime": idx, **row}
+                for idx, row in reg_table.reset_index().to_dict(orient="index").items()
+            ] if False else reg_table.reset_index().to_dict(orient="records"),
+        }
+
+    return {
+        "monte_carlo": ci,
+        "deflated_sharpe": {
+            "psr": round(float(psr), 4) if not np.isnan(psr) else None,
+            "dsr": round(float(dsr), 4) if not np.isnan(dsr) else None,
+            "n_trials": n_trials,
+            "trial_sharpe_variance": round(trial_var, 6),
+        },
+        "regime_analysis": regime_payload,
+    }
 
 
 def generate_equity_curve(start_date, n_days, ann_return, ann_vol, initial=100000):
@@ -406,9 +450,24 @@ portfolio_summary = {
     }
 }
 
-# ─── Write all files ────────────────────────────────────────────────
+# ─── Rigor metrics: MC CIs, DSR/PSR, regime analysis ───────────────
 
 strategies = [s1, s2, s3, s4, s5, s6]
+
+trial_sharpes = [s["test_metrics"]["sharpe"] for s in strategies]
+
+for idx, s in enumerate(strategies):
+    eq = np.array([pt["value"] for pt in s["equity_curve"]], dtype=float)
+    if len(eq) < 2:
+        continue
+    returns = np.diff(eq) / eq[:-1]
+    dates = [pt["date"] for pt in s["equity_curve"][1:]]
+    s["rigor"] = compute_rigor_metrics(
+        returns, dates, trial_sharpes, n_trials=len(strategies), seed=idx + 1
+    )
+
+# ─── Write all files ────────────────────────────────────────────────
+
 for s in strategies:
     filepath = OUTPUT_DIR / f"{s['strategy']}.json"
     with open(filepath, "w") as f:

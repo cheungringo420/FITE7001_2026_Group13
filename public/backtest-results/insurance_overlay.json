@@ -1,7 +1,7 @@
 {
   "strategy": "insurance_overlay",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.990348",
+  "generated_at": "2026-04-17T03:37:08.511843",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -438,5 +438,62 @@
     "correlation_vs_spy": -0.22,
     "is_genuine_hedge": true,
     "carry_cost_annualized": 0.032
+  },
+  "rigor": {
+    "monte_carlo": {
+      "sharpe": {
+        "point_estimate": 5.237117,
+        "ci_lower": 2.573933,
+        "ci_upper": 11.146818,
+        "std_error": 2.213656
+      },
+      "max_drawdown": {
+        "point_estimate": -0.021176,
+        "ci_lower": -0.038467,
+        "ci_upper": -0.008715,
+        "std_error": 0.007069
+      },
+      "ann_return": {
+        "point_estimate": 0.781118,
+        "ci_lower": 0.253639,
+        "ci_upper": 2.02258,
+        "std_error": 0.474422
+      },
+      "n_simulations": 500,
+      "method": "block",
+      "block_size": 5
+    },
+    "deflated_sharpe": {
+      "psr": 0.9867,
+      "dsr": 0.0011,
+      "n_trials": 6,
+      "trial_sharpe_variance": 0.364627
+    },
+    "regime_analysis": {
+      "regime_names": {
+        "0": "low_vol",
+        "1": "high_vol"
+      },
+      "table": [
+        {
+          "regime": "low_vol",
+          "label": 0,
+          "n_days": 29,
+          "sharpe": 8.8234,
+          "ann_return": 0.701472,
+          "ann_vol": 0.079501,
+          "max_drawdown": -0.013235
+        },
+        {
+          "regime": "high_vol",
+          "label": 1,
+          "n_days": 25,
+          "sharpe": 6.2896,
+          "ann_return": 0.87817,
+          "ann_vol": 0.139622,
+          "max_drawdown": -0.021176
+        }
+      ]
+    }
   }
 }

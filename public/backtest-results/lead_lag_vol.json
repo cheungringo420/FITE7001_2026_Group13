@@ -1,7 +1,7 @@
 {
   "strategy": "lead_lag_vol",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.989721",
+  "generated_at": "2026-04-17T03:37:08.511655",
   "splits": {
     "train_end": "2025-09-30",
     "test_start": "2026-02-01"
@@ -480,5 +480,62 @@
     "full_name": "Cross-Asset Event Transmission Score",
     "description": "Rolling 30-day beta of traditional asset returns on lagged PM probability changes. Predicts forward VIX moves with peak t-stat 3.8 at horizon h=3.",
     "formula": "CAETS(asset, event, t) = \u03b2\u0302 from rolling OLS: R_asset(t+k) ~ \u0394P_event(t)"
+  },
+  "rigor": {
+    "monte_carlo": {
+      "sharpe": {
+        "point_estimate": 0.730764,
+        "ci_lower": -2.61224,
+        "ci_upper": 4.860051,
+        "std_error": 1.938555
+      },
+      "max_drawdown": {
+        "point_estimate": -0.096745,
+        "ci_lower": -0.210641,
+        "ci_upper": -0.044051,
+        "std_error": 0.045769
+      },
+      "ann_return": {
+        "point_estimate": 0.248396,
+        "ci_lower": -0.473732,
+        "ci_upper": 3.240142,
+        "std_error": 1.048155
+      },
+      "n_simulations": 500,
+      "method": "block",
+      "block_size": 5
+    },
+    "deflated_sharpe": {
+      "psr": 0.6316,
+      "dsr": 0.0,
+      "n_trials": 6,
+      "trial_sharpe_variance": 0.364627
+    },
+    "regime_analysis": {
+      "regime_names": {
+        "0": "low_vol",
+        "1": "high_vol"
+      },
+      "table": [
+        {
+          "regime": "low_vol",
+          "label": 0,
+          "n_days": 29,
+          "sharpe": 5.2253,
+          "ann_return": 1.174197,
+          "ann_vol": 0.224713,
+          "max_drawdown": -0.036047
+        },
+        {
+          "regime": "high_vol",
+          "label": 1,
+          "n_days": 25,
+          "sharpe": -0.917,
+          "ann_return": -0.34508,
+          "ann_vol": 0.376317,
+          "max_drawdown": -0.138998
+        }
+      ]
+    }
   }
 }

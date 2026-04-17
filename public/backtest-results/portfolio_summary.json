@@ -1,7 +1,7 @@
 {
   "type": "portfolio_summary",
   "version": "1.0.0",
-  "generated_at": "2026-04-15T06:39:14.993542",
+  "generated_at": "2026-04-17T03:37:08.513059",
   "portfolio_metrics": {
     "sharpe": 1.65,
     "sortino": 2.12,
