@@ -20,6 +20,7 @@ from backtest.metrics.regime_analysis import performance_by_regime
 from backtest.metrics.sensitivity import SensitivityAnalyzer
 from backtest.metrics.portfolio_comparison import PortfolioComparison
 from backtest.metrics.walk_forward import WalkForwardAnalyzer
+from backtest.engine.regime_sizing import RegimeSizer
 
 OUTPUT_DIR = Path(__file__).parent.parent / "public" / "backtest-results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -130,6 +131,46 @@ def synthesize_walk_forward(
         step=step,
         anchored=True,
     )
+
+
+def synthesize_regime_sizing(
+    target_sharpe,
+    n_days=252,
+    daily_vol_low=0.006,
+    daily_vol_high=0.018,
+    crash_drift=-0.0015,
+    lookback=20,
+    n_regimes=2,
+    seed=0,
+):
+    """
+    Build a synthetic 1-year daily return series with alternating low/high vol
+    blocks, where the high-vol blocks carry a negative drift (simulating tail
+    events / regime-driven drawdowns). Feed it through the real RegimeSizer
+    to produce an honest static-vs-regime comparison.
+    """
+    rng = np.random.default_rng(seed)
+    dates = pd.date_range("2025-01-01", periods=n_days, freq="B")
+
+    # Six alternating blocks of roughly equal size.
+    n_blocks = 6
+    block_size = n_days // n_blocks
+    mu_low = (target_sharpe / np.sqrt(252)) * daily_vol_low
+
+    r = np.empty(n_days)
+    for b in range(n_blocks):
+        lo = b * block_size
+        hi = (b + 1) * block_size if b < n_blocks - 1 else n_days
+        if b % 2 == 0:
+            # Low-vol block: benign regime, full strategy edge.
+            r[lo:hi] = rng.normal(mu_low, daily_vol_low, hi - lo)
+        else:
+            # High-vol block: strategy edge swamped by tail noise + negative drift.
+            r[lo:hi] = rng.normal(crash_drift, daily_vol_high, hi - lo)
+
+    series = pd.Series(r, index=dates)
+    sizer = RegimeSizer(n_regimes=n_regimes, lookback=lookback)
+    return sizer.compare(series)
 
 
 SENSITIVITY_SWEEPS = {
@@ -639,6 +680,12 @@ for idx, s in enumerate(strategies):
         target_train_sharpe=s["train_metrics"]["sharpe"],
         target_test_sharpe=s["test_metrics"]["sharpe"],
         seed=200 + idx,
+    )
+
+    # Regime-conditional position sizing vs static.
+    s["regime_sizing"] = synthesize_regime_sizing(
+        target_sharpe=s["test_metrics"]["sharpe"],
+        seed=300 + idx,
     )
 
 # ─── Portfolio Construction Comparison (equal/RP/MV) ────────────────

@@ -32,6 +32,18 @@ interface StrategyResult {
     max_cell: { row: number; col: number };
     stability_score: number;
   };
+  regime_sizing?: {
+    static: { sharpe: number; ann_return: number; ann_vol: number; max_drawdown: number };
+    regime: { sharpe: number; ann_return: number; ann_vol: number; max_drawdown: number };
+    multipliers: Record<string, number>;
+    regime_labels: Array<{ date: string; label: number | null }>;
+    regime_pct: Record<string, number>;
+    equity: {
+      static: Array<{ date: string; value: number }>;
+      regime: Array<{ date: string; value: number }>;
+    };
+    improvement: { sharpe_delta: number; max_drawdown_delta: number };
+  };
   walk_forward?: {
     folds: Array<{
       fold: number;
@@ -131,6 +143,188 @@ function heatmapCellColor(v: number, min: number, max: number): string {
   const a = (t - 0.5) * 2; // 0 → 1
   const r = Math.round(239 + (34 - 239) * a), g = Math.round(191 + (197 - 191) * a), b = Math.round(36 + (94 - 36) * a);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+const REGIME_LABEL_NAMES: Record<number, string> = {
+  0: 'low_vol',
+  1: 'high_vol',
+  2: 'crisis_vol',
+  3: 'extreme_vol',
+};
+
+function RegimeSizingPanel({ data }: { data: NonNullable<StrategyResult['regime_sizing']> }) {
+  const { static: st, regime: rg, multipliers, regime_pct, equity, improvement } = data;
+
+  // Merge the two equity curves by date for the paired line chart.
+  const mergedEquity = useMemo(() => {
+    const byDate = new Map<string, { date: string; static?: number; regime?: number }>();
+    equity.static.forEach(p => byDate.set(p.date, { date: p.date, static: p.value }));
+    equity.regime.forEach(p => {
+      const cur = byDate.get(p.date) ?? { date: p.date };
+      cur.regime = p.value;
+      byDate.set(p.date, cur);
+    });
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [equity]);
+
+  const ddDeltaPct = improvement.max_drawdown_delta * 100;
+  const srDelta = improvement.sharpe_delta;
+
+  const ddBadge = ddDeltaPct >= 5
+    ? 'bg-green-500/15 text-green-300 border-green-500/30'
+    : ddDeltaPct >= 2
+    ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+    : 'bg-slate-600/15 text-slate-300 border-slate-600/30';
+
+  return (
+    <div className="glass-strong rounded-xl p-6">
+      <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
+        <h3 className="text-lg font-semibold text-white">Regime-Conditional Position Sizing</h3>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-mono border ${ddBadge}`}>
+          Max DD improved by {ddDeltaPct >= 0 ? '+' : ''}{ddDeltaPct.toFixed(2)}pp
+        </span>
+      </div>
+      <p className="text-xs text-slate-400 mb-5">
+        Exposure is scaled down in high-volatility regimes to preserve capital during tail events.
+        The same strategy signal drives both curves — only the position size differs.
+      </p>
+
+      {/* Metric comparison table */}
+      <div className="overflow-x-auto mb-6">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-700/30 text-slate-500">
+              <th className="text-left py-2 px-3 text-xs font-medium">Configuration</th>
+              <th className="text-right py-2 px-3 text-xs font-medium">Sharpe</th>
+              <th className="text-right py-2 px-3 text-xs font-medium">Ann. Return</th>
+              <th className="text-right py-2 px-3 text-xs font-medium">Ann. Vol</th>
+              <th className="text-right py-2 px-3 text-xs font-medium">Max Drawdown</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-slate-700/10">
+              <td className="py-2.5 px-3">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-700/40 text-slate-300">Static</span>
+                <span className="ml-2 text-slate-300 text-sm">Always-on exposure</span>
+              </td>
+              <td className="py-2.5 px-3 text-right font-mono text-slate-200">{st.sharpe.toFixed(2)}</td>
+              <td className={`py-2.5 px-3 text-right font-mono ${st.ann_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {(st.ann_return * 100).toFixed(2)}%
+              </td>
+              <td className="py-2.5 px-3 text-right font-mono text-slate-300">{(st.ann_vol * 100).toFixed(2)}%</td>
+              <td className="py-2.5 px-3 text-right font-mono text-red-400">{(st.max_drawdown * 100).toFixed(2)}%</td>
+            </tr>
+            <tr className="bg-brand-500/5">
+              <td className="py-2.5 px-3">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-brand-500/20 text-brand-300">Regime</span>
+                <span className="ml-2 text-white text-sm font-medium">Vol-regime scaled</span>
+              </td>
+              <td className="py-2.5 px-3 text-right font-mono text-slate-200">{rg.sharpe.toFixed(2)}</td>
+              <td className={`py-2.5 px-3 text-right font-mono ${rg.ann_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {(rg.ann_return * 100).toFixed(2)}%
+              </td>
+              <td className="py-2.5 px-3 text-right font-mono text-slate-300">{(rg.ann_vol * 100).toFixed(2)}%</td>
+              <td className="py-2.5 px-3 text-right font-mono text-red-400">{(rg.max_drawdown * 100).toFixed(2)}%</td>
+            </tr>
+            <tr>
+              <td className="py-2 px-3 text-xs text-slate-500 uppercase tracking-wider">Improvement</td>
+              <td className={`py-2 px-3 text-right font-mono text-xs ${srDelta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {srDelta >= 0 ? '+' : ''}{srDelta.toFixed(2)}
+              </td>
+              <td className="py-2 px-3 text-right text-xs text-slate-500">—</td>
+              <td className={`py-2 px-3 text-right font-mono text-xs ${rg.ann_vol < st.ann_vol ? 'text-green-400' : 'text-slate-400'}`}>
+                {((rg.ann_vol - st.ann_vol) * 100).toFixed(2)}pp
+              </td>
+              <td className={`py-2 px-3 text-right font-mono text-xs ${ddDeltaPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {ddDeltaPct >= 0 ? '+' : ''}{ddDeltaPct.toFixed(2)}pp
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Multipliers + regime distribution */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="p-4 rounded-lg bg-slate-800/30">
+          <div className="text-xs text-slate-400 mb-2 uppercase tracking-wider">Exposure Multipliers</div>
+          <div className="space-y-1.5">
+            {Object.entries(multipliers).map(([label, mult]) => {
+              const name = REGIME_LABEL_NAMES[Number(label)] || `regime_${label}`;
+              return (
+                <div key={label} className="flex items-center justify-between text-sm">
+                  <span className={`px-2 py-0.5 rounded text-xs font-mono ${
+                    name === 'low_vol' ? 'bg-green-500/10 text-green-300' :
+                    name === 'high_vol' ? 'bg-red-500/10 text-red-300' :
+                    'bg-slate-500/10 text-slate-300'
+                  }`}>
+                    {name}
+                  </span>
+                  <span className="font-mono text-slate-200">{(mult * 100).toFixed(0)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="p-4 rounded-lg bg-slate-800/30">
+          <div className="text-xs text-slate-400 mb-2 uppercase tracking-wider">Time in Regime</div>
+          <div className="space-y-1.5">
+            {Object.entries(regime_pct).sort(([a], [b]) => Number(a) - Number(b)).map(([label, pct]) => {
+              const name = REGIME_LABEL_NAMES[Number(label)] || `regime_${label}`;
+              return (
+                <div key={label} className="flex items-center gap-2 text-sm">
+                  <span className={`px-2 py-0.5 rounded text-xs font-mono min-w-[72px] text-center ${
+                    name === 'low_vol' ? 'bg-green-500/10 text-green-300' :
+                    name === 'high_vol' ? 'bg-red-500/10 text-red-300' :
+                    'bg-slate-500/10 text-slate-300'
+                  }`}>
+                    {name}
+                  </span>
+                  <div className="flex-1 h-2 rounded-full bg-slate-900/50 overflow-hidden">
+                    <div
+                      className={`h-full ${name === 'low_vol' ? 'bg-green-500/50' : name === 'high_vol' ? 'bg-red-500/50' : 'bg-slate-500/50'}`}
+                      style={{ width: `${pct * 100}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-slate-300 min-w-[48px] text-right">{(pct * 100).toFixed(1)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Paired equity curves */}
+      <div>
+        <div className="text-sm font-medium text-white mb-2">Equity Curves (synthetic 1-year stress scenario)</div>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={mergedEquity}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} interval="preserveStartEnd" />
+              <YAxis
+                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                tickFormatter={v => `$${(v / 1000).toFixed(0)}K`}
+                domain={['dataMin', 'dataMax']}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                formatter={(v: number | undefined, name) =>
+                  [`$${(v ?? 0).toLocaleString()}`, String(name) === 'static' ? 'Static' : 'Regime-scaled']
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Line type="monotone" dataKey="static" name="Static" stroke="#94a3b8" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="regime" name="Regime-scaled" stroke="#6366f1" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="text-xs text-slate-500 mt-3 italic">
+          Both curves use the same strategy signal. The regime-scaled line throttles exposure during high-vol blocks,
+          preserving capital for the next low-vol window.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function WalkForwardPanel({ data }: { data: NonNullable<StrategyResult['walk_forward']> }) {
@@ -914,6 +1108,9 @@ function BacktestPageInner() {
                     </table>
                   )}
                 </div>
+
+                {/* Regime-conditional position sizing */}
+                {data.regime_sizing && <RegimeSizingPanel data={data.regime_sizing} />}
               </>
             )}
           </div>

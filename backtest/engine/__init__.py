@@ -4,3 +4,4 @@ from .risk import RiskManager
 from .portfolio import PortfolioAggregator
 from .orderbook_slippage import OrderbookSlippageModel, BookLevel
 from .regime import VolatilityRegimeDetector
+from .regime_sizing import RegimeSizer
