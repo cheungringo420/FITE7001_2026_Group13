@@ -4,8 +4,31 @@ import { useEffect, useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, ScatterChart, Scatter, Cell
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, Cell
 } from 'recharts';
+
+// Robustness payloads come in two shapes: either a scalar Sharpe or a
+// { sharpe, ann_return, … } dict keyed by scenario name. `any` on that field
+// was causing the rest of the render to be type-unsafe; this union captures
+// the real shape.
+type RobustnessEntry = number | { sharpe: number; ann_return?: number; [key: string]: number | undefined };
+
+// Strategy-specific diagnostic blocks (hedge effectiveness, dynamic-vs-static)
+// are ad-hoc numeric/bool dicts; keep a narrow-but-flexible type so downstream
+// arithmetic and .toFixed() calls stay type-safe.
+interface HedgeEffectiveness {
+  beta_vs_spy: number;
+  correlation_vs_spy: number;
+  is_genuine_hedge: boolean;
+  [key: string]: number | boolean;
+}
+interface DynamicVsStatic {
+  dynamic_sharpe: number;
+  static_sharpe: number;
+  carry_cost_saved_pct: number;
+  drawdown_improvement: number;
+  [key: string]: number;
+}
 
 interface StrategyResult {
   strategy: string;
@@ -17,14 +40,14 @@ interface StrategyResult {
   event_study: { day: number; car: number; n_events: number }[];
   risk_metrics: { train: Record<string, number>; test: Record<string, number> };
   overfit_check: { train_sharpe: number; test_sharpe: number; ratio: number | null; flagged: boolean };
-  robustness: Record<string, any>;
+  robustness: Record<string, RobustnessEntry>;
   trade_log: { entry: string; exit: string; pnl: number }[];
   novel_contribution?: { name: string; full_name: string; description: string; formula: string };
   predictive_regression?: Record<string, { beta: number; tstat: number; r2: number }>;
   honest_finding?: string;
   caveat?: string;
-  hedge_effectiveness?: Record<string, any>;
-  dynamic_vs_static?: Record<string, any>;
+  hedge_effectiveness?: HedgeEffectiveness;
+  dynamic_vs_static?: DynamicVsStatic;
   sensitivity?: {
     sharpe_grid: number[][];
     param_x: { name: string; values: number[]; label?: string; fmt?: 'pct' | 'float' | 'int' };
@@ -611,11 +634,19 @@ function BacktestPageInner() {
   const [activeTab, setActiveTab] = useState<'overview' | 'equity' | 'factors' | 'robustness' | 'events' | 'rigor'>('overview');
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/backtest-results/${selected}.json`)
+    // Abort stale fetches when the user switches strategy mid-flight.
+    const controller = new AbortController();
+    let alive = true;
+    // Defer the setState(true) to a microtask so we don't trigger a cascading
+    // render in the effect body itself (React hook rule: no sync setState in effects).
+    Promise.resolve().then(() => { if (alive) setLoading(true); });
+
+    fetch(`/backtest-results/${selected}.json`, { signal: controller.signal })
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => { if (alive) { setData(d); setLoading(false); } })
+      .catch((e) => { if (alive && e?.name !== 'AbortError') setLoading(false); });
+
+    return () => { alive = false; controller.abort(); };
   }, [selected]);
 
   const monoData = useMemo(() => {
@@ -628,16 +659,33 @@ function BacktestPageInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-slate-400">Loading backtest results...</div>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-full border-2 border-slate-700 border-t-brand-400 animate-spin" />
+          <div className="text-sm text-slate-400 font-mono tracking-wide">
+            loading {STRATEGY_NAMES[selected] ?? selected}…
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-400">Failed to load results for {selected}</div>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="glass-strong rounded-xl p-8 max-w-md text-center">
+          <div className="text-4xl mb-3">⚠</div>
+          <div className="text-red-400 font-semibold mb-2">Failed to load results</div>
+          <div className="text-sm text-slate-400 mb-4">
+            No backtest JSON found for <span className="font-mono text-slate-300">{selected}</span>.
+          </div>
+          <button
+            onClick={() => setSelected('cross_platform_arb')}
+            className="px-4 py-2 text-sm rounded-lg bg-brand-500/10 text-brand-300 border border-brand-500/30 hover:bg-brand-500/20 transition-colors"
+          >
+            Back to Cross-Platform Arbitrage
+          </button>
+        </div>
       </div>
     );
   }
@@ -719,7 +767,8 @@ function BacktestPageInner() {
             {/* Performance Table */}
             <div className="glass-strong rounded-xl p-6">
               <h3 className="text-lg font-semibold text-white mb-4">Performance Metrics</h3>
-              <table className="w-full">
+              <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full min-w-[20rem]">
                 <thead>
                   <tr className="border-b border-slate-700/30">
                     <th className="text-left py-2 px-3 text-slate-500 text-xs font-medium">Metric</th>
@@ -740,6 +789,7 @@ function BacktestPageInner() {
                   <MetricRow label="t-stat" train={tm.t_stat} test={sm.t_stat} fmt={fmtN} />
                 </tbody>
               </table>
+              </div>
               <div className="mt-4 pt-3 border-t border-slate-700/30 flex items-center justify-between">
                 <span className="text-xs text-slate-500">Overfit Ratio (Test/Train Sharpe):</span>
                 <span className={`text-sm font-mono ${data.overfit_check?.flagged ? 'text-red-400' : 'text-green-400'}`}>
@@ -901,26 +951,28 @@ function BacktestPageInner() {
               </div>
             </div>
 
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/30">
-                  <th className="py-2 px-3 text-left text-slate-500">Factor</th>
-                  <th className="py-2 px-3 text-right text-slate-500">Beta</th>
-                  <th className="py-2 px-3 text-right text-slate-500">t-stat</th>
-                  <th className="py-2 px-3 text-center text-slate-500">Significant?</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(data.factor_regression.betas || {}).map(([factor, v]) => (
-                  <tr key={factor} className="border-b border-slate-700/10">
-                    <td className="py-2 px-3 text-white">{factor}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-300">{v.beta.toFixed(4)}</td>
-                    <td className={`py-2 px-3 text-right font-mono ${Math.abs(v.tstat) >= 2 ? 'text-white font-bold' : 'text-slate-400'}`}>{v.tstat.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-center">{Math.abs(v.tstat) >= 2 ? 'Yes' : 'No'}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[28rem]">
+                <thead>
+                  <tr className="border-b border-slate-700/30">
+                    <th className="py-2 px-3 text-left text-slate-500">Factor</th>
+                    <th className="py-2 px-3 text-right text-slate-500">Beta</th>
+                    <th className="py-2 px-3 text-right text-slate-500">t-stat</th>
+                    <th className="py-2 px-3 text-center text-slate-500">Significant?</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {Object.entries(data.factor_regression.betas || {}).map(([factor, v]) => (
+                    <tr key={factor} className="border-b border-slate-700/10">
+                      <td className="py-2 px-3 text-white">{factor}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-300">{v.beta.toFixed(4)}</td>
+                      <td className={`py-2 px-3 text-right font-mono ${Math.abs(v.tstat) >= 2 ? 'text-white font-bold' : 'text-slate-400'}`}>{v.tstat.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-center">{Math.abs(v.tstat) >= 2 ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -931,23 +983,27 @@ function BacktestPageInner() {
             <p className="text-sm text-slate-400 mb-6">Strategy tested under different cost assumptions, liquidity thresholds, and parameter values.</p>
             {Object.keys(data.robustness).length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(data.robustness).map(([key, val]: [string, any]) => (
-                  <div key={key} className="p-4 rounded-lg bg-slate-800/30">
-                    <div className="text-xs text-slate-400 mb-2">{key.replace(/_/g, ' ')}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-300">Sharpe:</span>
-                      <SharpeColor value={typeof val === 'object' ? val.sharpe : val} />
-                    </div>
-                    {typeof val === 'object' && val.ann_return !== undefined && (
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-sm text-slate-300">Return:</span>
-                        <span className={`font-mono text-sm ${val.ann_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {(val.ann_return * 100).toFixed(1)}%
-                        </span>
+                {Object.entries(data.robustness).map(([key, val]) => {
+                  const sharpe = typeof val === 'object' && val !== null ? val.sharpe : (val as number);
+                  const annReturn = typeof val === 'object' && val !== null ? val.ann_return : undefined;
+                  return (
+                    <div key={key} className="p-4 rounded-lg bg-slate-800/30">
+                      <div className="text-xs text-slate-400 mb-2">{key.replace(/_/g, ' ')}</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">Sharpe:</span>
+                        <SharpeColor value={sharpe} />
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {annReturn !== undefined && (
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-sm text-slate-300">Return:</span>
+                          <span className={`font-mono text-sm ${annReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {(annReturn * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-slate-400">No robustness data available for this strategy.</p>

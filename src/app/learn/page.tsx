@@ -226,7 +226,7 @@ export default function LearnPage() {
             <h4 className="text-sm font-semibold text-white mb-3">Why Do Price Gaps Exist?</h4>
             <ul className="space-y-2 text-sm text-slate-300">
               <li className="flex items-start gap-2"><span className="text-brand-400 mt-0.5">1.</span> <span><strong>Different user bases</strong> — Polymarket skews crypto-native; Kalshi skews US institutional</span></li>
-              <li className="flex items-start gap-2"><span className="text-brand-400 mt-0.5">2.</span> <span><strong>Settlement differences</strong> — Different resolution criteria for "the same" event</span></li>
+              <li className="flex items-start gap-2"><span className="text-brand-400 mt-0.5">2.</span> <span><strong>Settlement differences</strong> — Different resolution criteria for &ldquo;the same&rdquo; event</span></li>
               <li className="flex items-start gap-2"><span className="text-brand-400 mt-0.5">3.</span> <span><strong>Capital friction</strong> — Moving money between platforms takes time</span></li>
               <li className="flex items-start gap-2"><span className="text-brand-400 mt-0.5">4.</span> <span><strong>Information asymmetry</strong> — Not all traders monitor both platforms</span></li>
             </ul>

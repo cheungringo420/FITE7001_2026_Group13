@@ -194,16 +194,31 @@ export default function PortfolioPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-slate-400">Loading portfolio analysis…</div>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-full border-2 border-slate-700 border-t-brand-400 animate-spin" />
+          <div className="text-sm text-slate-400 font-mono tracking-wide">loading portfolio analysis…</div>
+        </div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-400">Failed to load portfolio summary.</div>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="glass-strong rounded-xl p-8 max-w-md text-center">
+          <div className="text-4xl mb-3">⚠</div>
+          <div className="text-red-400 font-semibold mb-2">Failed to load portfolio summary</div>
+          <div className="text-sm text-slate-400 mb-4">
+            Expected <span className="font-mono text-slate-300">/backtest-results/portfolio_summary.json</span>.
+          </div>
+          <Link
+            href="/research"
+            className="inline-block px-4 py-2 text-sm rounded-lg bg-brand-500/10 text-brand-300 border border-brand-500/30 hover:bg-brand-500/20 transition-colors"
+          >
+            Back to Research
+          </Link>
+        </div>
       </div>
     );
   }
