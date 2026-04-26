@@ -65,14 +65,26 @@ export function computeTrustAnalysis(params: {
   const { consensusScore, conflictScore } = computeEvidenceConsensus(evidence);
   const integrityRisk = computeIntegrityRisk(market);
 
-  const trustScore = 100 * (
-    0.35 * criteria.clarityScore +
+  // Resolution Confidence Score — three-dimension weighted composite.
+  // 40% Criteria Clarity (ambiguous criteria invalidate every downstream step),
+  // 35% Evidence Consensus (oracle risk — unique to decentralised markets),
+  // 25% Integrity Risk inverted (historical dispute prior).
+  // Formula matches the design specified in the FITE7001 final report.
+  const resolutionConfidence = 100 * (
+    0.40 * criteria.clarityScore +
     0.35 * consensusScore +
-    0.2 * agreementScore +
-    0.1 * (1 - integrityRisk)
+    0.25 * (1 - integrityRisk)
   );
 
-  const resolutionConfidence = 100 * (0.5 * criteria.clarityScore + 0.5 * consensusScore);
+  // Trust score is the headline number surfaced to users. We keep the
+  // agreementScore overlay (signal from independent matching feedback)
+  // without letting it dominate the resolution-confidence semantics.
+  const trustScore = 100 * (
+    0.40 * criteria.clarityScore +
+    0.35 * consensusScore +
+    0.25 * (1 - integrityRisk) * (0.5 + 0.5 * agreementScore)
+  );
+
   const disputeRisk = 100 * (0.5 * (1 - criteria.clarityScore) + 0.5 * conflictScore);
 
   return {
