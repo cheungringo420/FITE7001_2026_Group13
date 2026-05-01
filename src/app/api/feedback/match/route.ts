@@ -7,16 +7,7 @@ export async function GET(request: Request) {
 
   const entries = await listMatchFeedback();
   const filtered = status ? entries.filter((entry) => entry.status === status) : entries;
-  return NextResponse.json(
-    { entries: filtered },
-    {
-      headers: {
-        Deprecation: 'true',
-        Sunset: 'Wed, 31 Dec 2026 23:59:59 GMT',
-        Link: '</api/feedback/matches>; rel="successor-version"',
-      },
-    },
-  );
+  return NextResponse.json({ entries: filtered });
 }
 
 export async function POST(request: Request) {
@@ -36,16 +27,7 @@ export async function POST(request: Request) {
     }
 
     const entry = await addMatchFeedback({ polymarketId, kalshiId, status, reason });
-    return NextResponse.json(
-      { entry },
-      {
-        headers: {
-          Deprecation: 'true',
-          Sunset: 'Wed, 31 Dec 2026 23:59:59 GMT',
-          Link: '</api/feedback/matches>; rel="successor-version"',
-        },
-      },
-    );
+    return NextResponse.json({ entry });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to save feedback';
     return NextResponse.json({ error: message }, { status: 500 });

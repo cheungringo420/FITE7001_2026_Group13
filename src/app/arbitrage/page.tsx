@@ -425,7 +425,7 @@ export default function ArbitragePage() {
                                     </div>
                                     {trust1 && (
                                         <div className="text-xs text-brand-300 mt-1 font-mono">
-                                            RAAS: {(opp.profitPercentage / 100 * (trust1.trustScore / 100) * 0.98).toFixed(4)}
+                                            RAAS: {(opp.profitPercentage / 100 * (trust1.trustScore / 100) * (1 - trust1.disputeRisk / 100)).toFixed(4)}
                                         </div>
                                     )}
                                     <button
