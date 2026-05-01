@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html><head><style>
+html { background: #0d121a; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0d121a; font-family: Arial, sans-serif; color: #f4f6f6;
+  display: flex; flex-direction: column;
+}
+.brand-bar { position: absolute; left: 0; top: 0; height: 100%; width: 6pt; background: #17e3c1; }
+.header { margin: 22pt 50pt 0 50pt; }
+.tag { font-family: 'Courier New', monospace; font-size: 10pt; color: #17e3c1; letter-spacing: 3pt; margin: 0 0 4pt 0; }
+h1 { font-size: 26pt; color: #f4f6f6; margin: 0 0 4pt 0; }
+.subtitle { font-size: 12pt; color: #94a3b8; margin: 0; font-style: italic; }
+.body-row { display: flex; gap: 14pt; margin: 12pt 50pt 0 50pt; }
+.left { flex: 1.05; display: flex; flex-direction: column; gap: 6pt; }
+.right { flex: 1; display: flex; flex-direction: column; gap: 6pt; }
+.box {
+  padding: 8pt 12pt; background: #151c27; border-radius: 4pt;
+  border-left: 3pt solid #94a3b8;
+}
+.box-title {
+  font-family: 'Courier New', monospace; font-size: 8pt;
+  color: #64748b; letter-spacing: 2pt; margin: 0 0 3pt 0;
+}
+.box-line {
+  font-family: 'Courier New', monospace; font-size: 10pt;
+  color: #e2e8f0; margin: 0 0 1pt 0; line-height: 1.4;
+}
+.box-poly { border-left-color: #17e3c1; }
+.box-derbit { border-left-color: #f39c12; }
+.box-edge { border-left-color: #ef4444; background: #2a1a1a; }
+.edge-num {
+  font-family: 'Courier New', monospace; font-size: 24pt; font-weight: bold;
+  color: #ef4444; margin: 2pt 0 0 0;
+}
+.edge-label { font-size: 9pt; color: #fca5a5; margin: 0; }
+.ticket-title {
+  font-family: 'Courier New', monospace; font-size: 9pt;
+  color: #17e3c1; letter-spacing: 2pt; margin: 0 0 4pt 0;
+}
+.ticket {
+  padding: 10pt 12pt; background: #0a0f17; border-radius: 4pt;
+  border: 1pt solid #1f2937;
+}
+.leg {
+  font-family: 'Courier New', monospace; font-size: 9pt;
+  color: #e2e8f0; margin: 0 0 3pt 0; line-height: 1.4;
+}
+.leg-buy { color: #22c55e; }
+.leg-sell { color: #f87171; }
+.muted { color: #94a3b8; }
+.profit-row { display: flex; gap: 8pt; margin: 6pt 0 0 0; }
+.profit-card {
+  flex: 1; padding: 6pt 8pt; background: #0d1219;
+  border-radius: 3pt; text-align: center;
+}
+.profit-num {
+  font-family: 'Courier New', monospace; font-size: 14pt; font-weight: bold;
+  color: #22c55e; margin: 0;
+}
+.profit-label { font-size: 8pt; color: #64748b; margin: 0; }
+</style></head>
+<body>
+<div class="brand-bar"></div>
+<div class="header">
+  <p class="tag">WORKED EXAMPLE / $80K BTC</p>
+  <h1>From a question to a trade ticket</h1>
+  <p class="subtitle">"Will Bitcoin reach $80,000 by May 31, 2026?" &mdash; BTC spot $77,000</p>
+</div>
+<div class="body-row">
+  <div class="left">
+    <div class="box box-poly">
+      <p class="box-title">POLYMARKET YES PRICE</p>
+      <p class="box-line">$0.45 &rarr; market says <b>45%</b> chance</p>
+    </div>
+    <div class="box box-derbit">
+      <p class="box-title">DERIBIT $80K / $82K CALL SPREAD</p>
+      <p class="box-line">$80K call mid: <b>$1,200</b></p>
+      <p class="box-line">$82K call mid: &nbsp;<b>$720</b></p>
+      <p class="box-line">Spread cost: &nbsp;&nbsp;<b>$480</b></p>
+      <p class="box-line">Per-$1 binary: $480 / $2,000 = <b>$0.24</b></p>
+      <p class="box-line">Options imply &rarr; <b>24%</b> chance</p>
+    </div>
+    <div class="box box-edge">
+      <p class="box-title">DISAGREEMENT</p>
+      <p class="edge-num">21pp</p>
+      <p class="edge-label">Polymarket overprices YES contract</p>
+    </div>
+  </div>
+  <div class="right">
+    <p class="ticket-title">SUGGESTED TRADE / $1,000 NOTIONAL</p>
+    <div class="ticket">
+      <p class="leg"><span class="leg-sell">SELL</span> 1,300 <span class="muted">POLY</span> market-id-xxx @ <b>$0.45</b></p>
+      <p class="leg"><span class="leg-buy">BUY</span> &nbsp;&nbsp;&nbsp;&nbsp;1 <span class="muted">DERIBIT</span> BTC-30MAY26-80000-C @ <b>$1,200</b></p>
+      <p class="leg"><span class="leg-sell">SELL</span> &nbsp;&nbsp;1 <span class="muted">DERIBIT</span> BTC-30MAY26-82000-C @ <b>$720</b></p>
+      <div class="profit-row">
+        <div class="profit-card">
+          <p class="profit-num">+$105</p>
+          <p class="profit-label">cash up front</p>
+        </div>
+        <div class="profit-card">
+          <p class="profit-num">~$210</p>
+          <p class="profit-label">edge per trade</p>
+        </div>
+      </div>
+    </div>
+    <div class="box" style="border-left-color: #17e3c1; padding: 7pt 12pt;">
+      <p class="box-line" style="color: #cbd5e1; font-size: 9pt;">Locked-in arbitrage edge net of basis risk. <b>This is what the live engine emits</b> as a structured ticket.</p>
+    </div>
+  </div>
+</div>
+</body></html>

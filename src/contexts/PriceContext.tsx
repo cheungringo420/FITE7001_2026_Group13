@@ -179,6 +179,12 @@ export function PriceProvider({ children }: { children: React.ReactNode }) {
             priceStore.updateKalshiPrice(update.ticker, prices);
         });
 
+        // Always-on: open both feeds immediately so the prototype is live by default.
+        setPolymarketStatus('connecting');
+        setKalshiStatus('connecting');
+        polyWs.current.connect();
+        kalshiWs.current.connect();
+
         return () => {
             unsubPolyStatus();
             unsubPolyPrice();

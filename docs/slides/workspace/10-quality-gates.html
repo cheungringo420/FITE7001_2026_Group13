@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html><head><style>
+html { background: #0d121a; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0d121a; font-family: Arial, sans-serif; color: #f4f6f6;
+  display: flex; flex-direction: column;
+}
+.brand-bar { position: absolute; left: 0; top: 0; height: 100%; width: 6pt; background: #17e3c1; }
+.header { margin: 22pt 50pt 0 50pt; }
+.tag { font-family: 'Courier New', monospace; font-size: 10pt; color: #17e3c1; letter-spacing: 3pt; margin: 0 0 4pt 0; }
+h1 { font-size: 26pt; color: #f4f6f6; margin: 0 0 4pt 0; }
+.subtitle { font-size: 12pt; color: #94a3b8; margin: 0; font-style: italic; }
+.gates-row { display: flex; gap: 14pt; margin: 14pt 50pt 0 50pt; }
+.gate { flex: 1; display: flex; flex-direction: column; }
+.gate-header {
+  background: #2a1a1a; border-left: 3pt solid #ef4444;
+  padding: 9pt 14pt; border-top-left-radius: 6pt; border-top-right-radius: 6pt;
+}
+.gate-rule {
+  font-family: 'Courier New', monospace; font-size: 9pt;
+  color: #fca5a5; letter-spacing: 2pt; margin: 0 0 2pt 0;
+}
+.gate-name {
+  font-size: 14pt; font-weight: bold; color: #f4f6f6; margin: 0;
+}
+.gate-body {
+  background: #151c27; padding: 10pt 14pt;
+  border-bottom-left-radius: 6pt; border-bottom-right-radius: 6pt;
+  display: flex; flex-direction: column; gap: 7pt;
+}
+.bad-ticket {
+  background: #0a0f17; border: 1pt dashed #475569;
+  padding: 7pt 10pt; border-radius: 4pt;
+}
+.bad-label {
+  font-family: 'Courier New', monospace; font-size: 8pt;
+  color: #94a3b8; letter-spacing: 1pt; margin: 0 0 3pt 0;
+}
+.bad-line {
+  font-family: 'Courier New', monospace; font-size: 9pt;
+  color: #cbd5e1; margin: 0 0 1pt 0; line-height: 1.4;
+}
+.strike { text-decoration: line-through; color: #64748b; }
+.why { font-size: 10pt; color: #cbd5e1; margin: 0; line-height: 1.35; }
+.why-bold { color: #f4f6f6; font-weight: bold; }
+.chip {
+  display: inline-block; padding: 2pt 7pt; background: #1e293b;
+  border-radius: 8pt; margin: 4pt 0 0 0;
+}
+.chip p {
+  color: #fbbf24; font-family: 'Courier New', monospace; font-size: 8pt;
+  margin: 0;
+}
+.scoreboard {
+  margin: 12pt 50pt 0 50pt; padding: 10pt 16pt;
+  background: #1e293b; border-left: 3pt solid #17e3c1; border-radius: 4pt;
+  display: flex; align-items: center; gap: 16pt;
+}
+.score-text { font-size: 10pt; color: #e2e8f0; margin: 0; line-height: 1.4; flex: 1; }
+.score-bold { color: #17e3c1; font-weight: bold; }
+.score-mono { font-family: 'Courier New', monospace; font-size: 9pt; color: #cbd5e1; }
+</style></head>
+<body>
+<div class="brand-bar"></div>
+<div class="header">
+  <p class="tag">QUALITY GATES</p>
+  <h1>Two filters that kill noise before it ships</h1>
+  <p class="subtitle">Each gate exists because of a specific failure mode the raw engine produces.</p>
+</div>
+<div class="gates-row">
+  <div class="gate">
+    <div class="gate-header">
+      <p class="gate-rule">RULE / OPTIONS-IMPLIED PROB &isin; [5%, 95%]</p>
+      <p class="gate-name">Wing-distortion gate</p>
+    </div>
+    <div class="gate-body">
+      <div class="bad-ticket">
+        <p class="bad-label">EXAMPLE / FILTERED OUT</p>
+        <p class="bad-line"><span class="strike">BTC &gt; $76K by today</span></p>
+        <p class="bad-line"><span class="strike">Poly: 99.9% &nbsp; Opts: 100.0% &nbsp; Edge: 0.1pp</span></p>
+        <div class="chip"><p>wing filtered &uarr; 1</p></div>
+      </div>
+      <p class="why"><span class="why-bold">Why:</span> deep ITM &mdash; both options trade near intrinsic. Spread cost &asymp; spread width &rArr; "100%" is an artifact, not signal.</p>
+    </div>
+  </div>
+  <div class="gate">
+    <div class="gate-header">
+      <p class="gate-rule">RULE / DAYS-TO-EXPIRATION &ge; 3</p>
+      <p class="gate-name">Gamma-noise gate</p>
+    </div>
+    <div class="gate-body">
+      <div class="bad-ticket">
+        <p class="bad-label">EXAMPLE / FILTERED OUT</p>
+        <p class="bad-line"><span class="strike">BTC &gt; $78K by today (4 hours)</span></p>
+        <p class="bad-line"><span class="strike">Poly: 20.5% &nbsp; Opts: 0.8% &nbsp; Edge: 19.7pp</span></p>
+        <div class="chip"><p>DTE&lt;3d filtered &uarr; 14</p></div>
+      </div>
+      <p class="why"><span class="why-bold">Why:</span> intraday gamma plays. Edge is real on paper but one tweet moves both prices instantly. Coin flip, not stable signal.</p>
+    </div>
+  </div>
+</div>
+<div class="scoreboard">
+  <p class="score-text"><span class="score-bold">Today's live filter scoreboard:</span> <span class="score-mono">scanned 32 &middot; matched 13 &middot; DTE-filtered 12 &middot; wing-filtered 0 &middot; in-band 1 &middot; opportunities 0</span></p>
+</div>
+</body></html>

@@ -29,7 +29,9 @@ function StatusDot({ status, label }: { status: Status; label: string }) {
 }
 
 export function ConnectionStatusIndicator() {
-    const { polymarket, kalshi, connect, isFullyConnected, hasAnyConnection } = useWebSocketStatus();
+    const { polymarket, kalshi, connect, disconnect, isFullyConnected, hasAnyConnection } = useWebSocketStatus();
+
+    const isDemo = !hasAnyConnection && polymarket === 'disconnected' && kalshi === 'disconnected';
 
     return (
         <div className="flex items-center gap-3 p-1">
@@ -39,23 +41,8 @@ export function ConnectionStatusIndicator() {
                 <StatusDot status={kalshi} label="Kalshi" />
             </div>
 
-            {/* Connect button if not connected */}
-            {!hasAnyConnection && (
-                <button
-                    onClick={connect}
-                    className="px-2 py-1 text-xs bg-brand-500/20 hover:bg-brand-500/30 
-                             text-brand-300 rounded transition-colors flex items-center gap-1"
-                >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Go Live
-                </button>
-            )}
-
-            {/* Live indicator if connected */}
-            {isFullyConnected && (
+            {/* Live / Partial / Demo pill — passive status, no CTA */}
+            {isFullyConnected ? (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 rounded-full">
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -63,14 +50,36 @@ export function ConnectionStatusIndicator() {
                     </span>
                     <span className="text-xs text-green-400 font-medium">LIVE</span>
                 </div>
+            ) : hasAnyConnection ? (
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-500/10 rounded-full">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                    <span className="text-xs text-yellow-400 font-medium">PARTIAL</span>
+                </div>
+            ) : (
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-700/30 rounded-full">
+                    <span className="w-2 h-2 rounded-full bg-slate-500" />
+                    <span className="text-xs text-slate-400 font-medium">DEMO</span>
+                </div>
             )}
+
+            {/* Demo Mode toggle — for offline presentations / rate-limit safety */}
+            <button
+                onClick={isDemo ? connect : disconnect}
+                className="px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-500
+                           hover:text-slate-300 border border-slate-700/50 hover:border-slate-600
+                           rounded transition-colors"
+                title={isDemo ? 'Resume live feeds' : 'Switch to demo mode (freeze prices)'}
+                style={{ fontFamily: 'var(--font-jetbrains-mono)' }}
+            >
+                {isDemo ? 'Resume' : 'Demo'}
+            </button>
         </div>
     );
 }
 
 // Compact version for mobile
 export function ConnectionStatusCompact() {
-    const { isFullyConnected, hasAnyConnection, connect } = useWebSocketStatus();
+    const { isFullyConnected, hasAnyConnection } = useWebSocketStatus();
 
     if (isFullyConnected) {
         return (
@@ -94,13 +103,9 @@ export function ConnectionStatusCompact() {
     }
 
     return (
-        <button
-            onClick={connect}
-            className="flex items-center gap-1 px-2 py-0.5 bg-slate-700 hover:bg-slate-600 
-                     text-slate-400 rounded-full text-xs transition-colors"
-        >
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-700/30 rounded-full">
             <span className="w-2 h-2 rounded-full bg-slate-500" />
-            OFFLINE
-        </button>
+            <span className="text-xs text-slate-400">DEMO</span>
+        </div>
     );
 }

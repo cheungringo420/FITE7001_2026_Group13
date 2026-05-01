@@ -767,12 +767,12 @@ export function ExecuteArbitrageModalV2({
                         </button>
                     )}
                     {result && result.success && (
-                        <a
-                            href="/portfolio"
+                        <button
+                            onClick={onClose}
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-brand-500 to-accent-cyan hover:from-brand-600 hover:to-accent-cyan text-white font-semibold rounded-xl transition-all text-center"
                         >
-                            View Portfolio
-                        </a>
+                            Done
+                        </button>
                     )}
                 </div>
             </div>
