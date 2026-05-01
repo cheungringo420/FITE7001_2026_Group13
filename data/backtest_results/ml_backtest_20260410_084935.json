@@ -1,0 +1,174 @@
+{
+  "timestamp": "20260410_084935",
+  "model": "gbm",
+  "n_markets": 5000,
+  "chi_square": {
+    "30": {
+      "threshold": 30,
+      "n_low_trust": 94,
+      "n_high_trust": 4906,
+      "risk_rate_low": 0.766,
+      "risk_rate_high": 0.4209,
+      "lift_ratio": 1.82,
+      "chi2": 44.8693,
+      "p_value": 0.0,
+      "is_significant": "True"
+    },
+    "40": {
+      "threshold": 40,
+      "n_low_trust": 1041,
+      "n_high_trust": 3959,
+      "risk_rate_low": 0.7329,
+      "risk_rate_high": 0.3471,
+      "lift_ratio": 2.112,
+      "chi2": 501.5467,
+      "p_value": 0.0,
+      "is_significant": "True"
+    },
+    "50": {
+      "threshold": 50,
+      "n_low_trust": 4140,
+      "n_high_trust": 860,
+      "risk_rate_low": 0.385,
+      "risk_rate_high": 0.6314,
+      "lift_ratio": 0.61,
+      "chi2": 176.613,
+      "p_value": 0.0,
+      "is_significant": "True"
+    },
+    "60": {
+      "threshold": 60,
+      "n_low_trust": 4934,
+      "n_high_trust": 66,
+      "risk_rate_low": 0.4311,
+      "risk_rate_high": 0.1515,
+      "lift_ratio": 2.845,
+      "chi2": 20.801,
+      "p_value": 5e-06,
+      "is_significant": "True"
+    },
+    "70": {
+      "threshold": 70,
+      "n_low_trust": 4985,
+      "n_high_trust": 15,
+      "risk_rate_low": 0.4279,
+      "risk_rate_high": 0.2667,
+      "lift_ratio": 1.605,
+      "chi2": 1.5883,
+      "p_value": 0.207575,
+      "is_significant": "False"
+    }
+  },
+  "ml_metrics": {
+    "model_type": "gbm",
+    "n_samples": 4165,
+    "n_risky": 1895,
+    "risk_rate": 0.4549819927971189,
+    "auc_roc": 0.9985,
+    "auc_roc_cal": 0.9984,
+    "brier_uncal": 0.003726,
+    "brier_cal": 0.002872,
+    "logloss_uncal": 0.029889,
+    "logloss_cal": 0.023745,
+    "top_features": [
+      {
+        "feature": "log_volume",
+        "importance": 0.9926251297887478
+      },
+      {
+        "feature": "vol_liq_ratio",
+        "importance": 0.0017850176327037768
+      },
+      {
+        "feature": "description_length",
+        "importance": 0.0016927861208124242
+      },
+      {
+        "feature": "log_liquidity",
+        "importance": 0.0008532416363901367
+      },
+      {
+        "feature": "description_ratio",
+        "importance": 0.0006810565260327776
+      },
+      {
+        "feature": "question_length",
+        "importance": 0.0004649052263609901
+      },
+      {
+        "feature": "resolution_src_length",
+        "importance": 0.00043961288139933777
+      },
+      {
+        "feature": "composite_score",
+        "importance": 0.00026254686745297946
+      },
+      {
+        "feature": "question_word_count",
+        "importance": 0.00025711799104460745
+      },
+      {
+        "feature": "resolve_dow",
+        "importance": 0.00021095815446900467
+      },
+      {
+        "feature": "criteria_clarity",
+        "importance": 0.0001551011534880276
+      },
+      {
+        "feature": "resolve_month",
+        "importance": 0.00014473968232948709
+      },
+      {
+        "feature": "evidence_consensus",
+        "importance": 0.0001241290137120444
+      },
+      {
+        "feature": "resolution_src_is_gov",
+        "importance": 8.670018101962512e-05
+      },
+      {
+        "feature": "has_resolution_url",
+        "importance": 8.400286343274822e-05
+      }
+    ]
+  },
+  "pnl_simulation": [
+    {
+      "strategy": "No Filter",
+      "n_accepted": 5000,
+      "n_risky": 2137,
+      "n_safe": 2863,
+      "risk_rate": 0.4274,
+      "pnl": "72600",
+      "pnl_per_trade": 14.52
+    },
+    {
+      "strategy": "Trust \u2265 50.0",
+      "n_accepted": 860,
+      "n_risky": 543,
+      "n_safe": 317,
+      "risk_rate": 0.6314,
+      "pnl": "-22600",
+      "pnl_per_trade": -26.28
+    },
+    {
+      "strategy": "ML Risk < 0.4",
+      "n_accepted": 2275,
+      "n_risky": 877,
+      "n_safe": 1398,
+      "risk_rate": 0.3855,
+      "pnl": "52100",
+      "pnl_per_trade": 22.9
+    },
+    {
+      "strategy": "Trust \u2265 50.0 + ML < 0.4",
+      "n_accepted": 336,
+      "n_risky": 191,
+      "n_safe": 145,
+      "risk_rate": 0.5685,
+      "pnl": "-4600",
+      "pnl_per_trade": -13.69
+    }
+  ]
+}

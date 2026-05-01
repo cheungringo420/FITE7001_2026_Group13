@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* Turbopack is the Next.js 16 default bundler. The empty turbopack
+     config silences the "webpack config with no turbopack config" error.
+     The webpack block below is still used for production builds. */
+  turbopack: {},
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'polymarket.com' },

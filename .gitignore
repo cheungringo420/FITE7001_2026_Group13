@@ -40,3 +40,53 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code session data
+.claude/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# One-off fix/deploy scripts (root-level development artifacts)
+/*.py
+
+# Draft documents and interim reports (keep only in final submission)
+*.pdf
+docs/*.docx
+docs/*.backup-*.docx
+docs/*.pptx
+data/*.pdf
+
+# Parquet/data files (too large for public repo)
+*.parquet
+
+# Exploration summaries (dev notes, not deliverables)
+docs/EXPLORATION-SUMMARY.md
+docs/WEBSITE-EXPLORATION-SUMMARY.md
+docs/reliability-core-migration.md
+docs/website-analysis-*.md
+docs/website-visual-summary.md
+
+# Legacy pptx workspace artifacts
+docs/pptx-workspace/
+
+# Slide build tooling node_modules
+docs/slides/workspace/node_modules/
+
+# Temporary architecture diagrams
+public/architecture-diagram-*.png
+public/*.docx
+
+# Python virtual environments
+venv/
+**/venv/
+
+# Large data snapshots
+data/core/market-snapshot.json
+
+# Supabase local
+supabase/
+
+# CSS backups
+*.css.backup

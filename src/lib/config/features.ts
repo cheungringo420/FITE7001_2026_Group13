@@ -19,3 +19,20 @@ export function isLabsEnabled(): boolean {
     process.env.LABS_ENABLED === 'true'
   );
 }
+
+/** Returns a structured feature flags object. */
+export function getFeatureFlags() {
+  return {
+    labs: isLabsEnabled(),
+    executionMode: getExecutionMode(),
+    synthetic: isSyntheticEnabled(),
+  };
+}
+
+/** Returns true when synthetic/demo data fallbacks are enabled. */
+export function isSyntheticEnabled(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_SYNTHETIC_ENABLED === 'true' ||
+    process.env.SYNTHETIC_ENABLED === 'true'
+  );
+}

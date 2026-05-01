@@ -40,3 +40,28 @@ export function recordAuditEvent(
 export function getAuditLog(): readonly AuditEvent[] {
   return auditLog;
 }
+
+/** Get the audit trail for a specific execution. */
+export function getAuditTrail(executionId: string): AuditEvent[] | null {
+  const events = auditLog.filter((e) => e.executionId === executionId);
+  return events.length > 0 ? events : null;
+}
+
+/** Get the most recent execution history, grouped by executionId. */
+export function getExecutionHistory(limit: number = 20) {
+  const byId = new Map<string, AuditEvent[]>();
+  for (const event of auditLog) {
+    const list = byId.get(event.executionId) ?? [];
+    list.push(event);
+    byId.set(event.executionId, list);
+  }
+  return Array.from(byId.entries())
+    .map(([executionId, events]) => ({
+      executionId,
+      events,
+      startedAt: events[0]?.timestamp,
+      lastEventAt: events[events.length - 1]?.timestamp,
+    }))
+    .sort((a, b) => (b.lastEventAt ?? '').localeCompare(a.lastEventAt ?? ''))
+    .slice(0, limit);
+}
