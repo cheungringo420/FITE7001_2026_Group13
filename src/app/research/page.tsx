@@ -101,7 +101,7 @@ function MetricBadge({ value, label, color }: { value: string; label: string; co
   return (
     <div className="text-center">
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-slate-400 mt-1">{label}</div>
+      <div className="text-xs text-slate-300 mt-1">{label}</div>
     </div>
   );
 }
@@ -112,11 +112,12 @@ export default function ResearchPage() {
   const strategies = summary?.strategy_summaries || {};
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       {/* Hero */}
       <section className="relative py-20 overflow-hidden">
-        <div className="absolute inset-0 terminal-bg opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-500/5 via-transparent to-transparent" />
+        <div className="absolute inset-0 terminal-bg opacity-15" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-slate-950/85 to-slate-950" />
+        <div className="absolute inset-x-0 top-0 h-48 bg-brand-500/5 blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-sm mb-6">
@@ -125,12 +126,12 @@ export default function ResearchPage() {
               </svg>
               FITE7001 Group 13 — Phase 2 Research
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-brand-300 to-accent-cyan bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white drop-shadow-[0_0_18px_rgba(23,227,193,0.18)]">
+              <span>
                 Validated Strategies
               </span>
             </h1>
-            <p className="text-lg text-slate-400 leading-relaxed">
+            <p className="text-lg text-slate-200 leading-relaxed">
               Six strategies backtested with institutional-grade rigor. No look-ahead bias.
               Train/validation/test splits enforced in code. t-stat ≥ 3.0 threshold per Harvey, Liu & Zhu (2016).
             </p>
@@ -139,7 +140,7 @@ export default function ResearchPage() {
           {/* Portfolio-level summary metrics */}
           {pm && (
             <div className="mt-12 glass-strong rounded-2xl p-6 max-w-4xl mx-auto">
-              <h3 className="text-sm font-medium text-slate-400 mb-4 text-center uppercase tracking-wider">Portfolio Performance (Test Set: Feb–Apr 2026)</h3>
+              <h3 className="text-sm font-medium text-slate-300 mb-4 text-center uppercase tracking-wider">Portfolio Performance (Test Set: Feb–Apr 2026)</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                 <MetricBadge value={pm.sharpe.toFixed(2)} label="Sharpe Ratio" color="text-brand-300" />
                 <MetricBadge value={`${(pm.ann_return * 100).toFixed(1)}%`} label="Ann. Return" color="text-green-400" />
@@ -172,7 +173,7 @@ export default function ResearchPage() {
                     </div>
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-brand-300 transition-colors">{meta.label}</h3>
-                  <p className="text-sm text-slate-400 mb-4 line-clamp-2">{meta.desc}</p>
+                  <p className="text-sm text-slate-300 mb-4 line-clamp-2">{meta.desc}</p>
                   {strat && (
                     <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/30">
                       <div>
@@ -193,7 +194,7 @@ export default function ResearchPage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-[10px] text-slate-600 mt-3">{meta.academic}</p>
+                  <p className="text-[10px] text-slate-400 mt-3">{meta.academic}</p>
                 </div>
               </Link>
             );
@@ -205,7 +206,7 @@ export default function ResearchPage() {
       <section className="py-16 bg-gradient-to-b from-transparent via-brand-500/5 to-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold text-white mb-2">Novel Contributions</h2>
-          <p className="text-slate-400 mb-8">Three methodological innovations beyond existing literature.</p>
+          <p className="text-slate-300 mb-8">Three methodological innovations beyond existing literature.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {NOVEL_CONTRIBUTIONS.map((nc) => (
               <div key={nc.abbrev} className="glass-strong rounded-xl p-6 border border-brand-500/20">
@@ -213,7 +214,7 @@ export default function ResearchPage() {
                   {nc.abbrev}
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{nc.name}</h3>
-                <p className="text-sm text-slate-400 mb-4">{nc.description}</p>
+                <p className="text-sm text-slate-300 mb-4">{nc.description}</p>
                 <div className="bg-slate-900/50 rounded-lg p-3 font-mono text-xs text-accent-cyan break-all">
                   {nc.formula}
                 </div>

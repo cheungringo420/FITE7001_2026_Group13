@@ -125,12 +125,12 @@ export function NavBar() {
                         </div>
                         <div className="flex flex-col">
                             <span
-                                className="font-bold text-lg bg-gradient-to-r from-brand-300 to-cyan-300 bg-clip-text text-transparent"
+                                className="font-bold text-lg text-brand-200 drop-shadow-[0_0_12px_rgba(23,227,193,0.28)]"
                                 style={{ fontFamily: 'var(--font-space-grotesk)' }}
                             >
                                 PM Arbitrage
                             </span>
-                            <span className="text-[10px] text-slate-500 -mt-0.5 tracking-[0.22em] font-mono">
+                            <span className="text-[10px] text-slate-400 -mt-0.5 tracking-[0.22em] font-mono">
                                 PREDICTION MARKETS
                             </span>
                         </div>
