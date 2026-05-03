@@ -203,7 +203,7 @@ class ValidationSuite:
     def t_test_returns(returns: pd.Series) -> dict:
         """
         Test if mean return is significantly different from zero.
-        Threshold: t-stat ≥ 3.0 (Harvey, Liu & Zhang 2016).
+        Threshold: t-stat ≥ 3.0 (Harvey, Liu & Zhu 2016).
         """
         if returns.empty or len(returns) < 10:
             return {"t_stat": np.nan, "p_value": np.nan, "significant": False}

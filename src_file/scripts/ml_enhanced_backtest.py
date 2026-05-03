@@ -16,8 +16,8 @@ This script:
 6. Runs P&L simulation: filter by ML risk signal vs unfiltered
 
 Usage:
-  python3 scripts/ml_enhanced_backtest.py
-  python3 scripts/ml_enhanced_backtest.py --model xgboost
+  python3 src_file/scripts/ml_enhanced_backtest.py
+  python3 src_file/scripts/ml_enhanced_backtest.py --model xgboost
 """
 import argparse
 import json
@@ -39,7 +39,8 @@ import scipy.stats as stats
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-DATA_DIR    = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR    = os.path.join(REPO_ROOT, "data")
 RESULTS_DIR = os.path.join(DATA_DIR, "backtest_results")
 
 
@@ -133,27 +134,26 @@ def construct_labels(df: pd.DataFrame) -> pd.Series:
 
     Proxy for resolution risk = markets where:
     - Final price was between 0.30 and 0.70 (ambiguous outcome — market didn't converge)
-    - OR volume < $5000 (thin market, more vulnerable to manipulation)
-    - OR resolution_state is DISPUTED or CANCELLED
+    - OR resolution_state is DISPUTED, CANCELLED, or INVALID
+
+    Volume and liquidity remain input features, but they are deliberately not
+    included in the target label; otherwise the model can rediscover its own
+    label from log_volume and report an inflated AUC.
 
     This is a PROXY — it captures markets that would be flagged as risky
     by an institutional risk desk. It's not perfect, but it IS backtestable.
     """
     final_price = df["final_price"].astype(float).fillna(0.5)
-    volume      = df["volume_usd"].astype(float).fillna(0)
     state       = df["resolution_state"].fillna("")
 
     # Ambiguous final price (market didn't converge)
     ambiguous = (final_price >= 0.30) & (final_price <= 0.70)
 
-    # Thin market
-    thin = volume < 5000
-
     # Known bad states
     bad_state = state.isin(["DISPUTED", "CANCELLED", "INVALID"])
 
     # Combined label: any of these triggers → risk
-    label = (ambiguous | thin | bad_state).astype(int)
+    label = (ambiguous | bad_state).astype(int)
 
     return label
 

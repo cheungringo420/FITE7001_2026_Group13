@@ -5,8 +5,8 @@ Uses the SAME scoring logic as src/lib/trust/scoring.ts (Python port)
 to avoid look-ahead bias — scores computed AS OF T-7d before resolution.
 
 Usage:
-  python3 scripts/compute_historical_trust.py
-  python3 scripts/compute_historical_trust.py --push-supabase
+  python3 src_file/scripts/compute_historical_trust.py
+  python3 src_file/scripts/compute_historical_trust.py --push-supabase
 """
 import argparse
 import os
@@ -17,7 +17,8 @@ from typing import Optional
 
 import pandas as pd
 
-DATA_DIR   = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR   = os.path.join(REPO_ROOT, "data")
 INPUT_FILE  = os.path.join(DATA_DIR, "markets_history.parquet")
 OUTPUT_FILE = os.path.join(DATA_DIR, "trust_scores_historical.parquet")
 

@@ -87,7 +87,7 @@ const NOVEL_CONTRIBUTIONS = [
 ];
 
 const REFERENCES = [
-  { authors: 'Harvey, Liu & Zhang', year: 2016, title: '"…and the Cross-Section of Expected Returns"', use: 't-stat ≥ 3.0 threshold' },
+  { authors: 'Harvey, Liu & Zhu', year: 2016, title: '"…and the Cross-Section of Expected Returns"', use: 't-stat ≥ 3.0 threshold' },
   { authors: 'McLean & Pontiff', year: 2016, title: '"Does Academic Research Destroy Stock Return Predictability?"', use: 'Alpha persistence in new domains' },
   { authors: 'Wolfers & Zitzewitz', year: 2004, title: '"Prediction Markets"', use: 'Foundational PM literature' },
   { authors: 'Avellaneda & Stoikov', year: 2008, title: 'Optimal market-making model', use: 'S6 market-making framework' },
@@ -132,7 +132,7 @@ export default function ResearchPage() {
             </h1>
             <p className="text-lg text-slate-400 leading-relaxed">
               Six strategies backtested with institutional-grade rigor. No look-ahead bias.
-              Train/validation/test splits enforced in code. t-stat ≥ 3.0 threshold per Harvey, Liu & Zhang (2016).
+              Train/validation/test splits enforced in code. t-stat ≥ 3.0 threshold per Harvey, Liu & Zhu (2016).
             </p>
           </div>
 
@@ -248,7 +248,7 @@ export default function ResearchPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-brand-400 mt-0.5">✓</span>
-                <span><strong>t-stat ≥ 3.0</strong> threshold (Harvey, Liu & Zhang 2016)</span>
+                <span><strong>t-stat ≥ 3.0</strong> threshold (Harvey, Liu & Zhu 2016)</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-brand-400 mt-0.5">✓</span>

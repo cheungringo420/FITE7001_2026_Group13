@@ -456,8 +456,8 @@ function OptionsTab({ iv }: { iv: APIResponse['ivSurface'] }) {
                 IV surface fetched: {new Date(iv.fetchedAt).toLocaleString()}
               </p>
               <p className="text-xs text-[#475569]">
-                Run <code className="text-[#34d399]">python3 scripts/deribit_iv_surface.py</code> to refresh,
-                then <code className="text-[#34d399]">python3 scripts/alpha_scanner.py</code> for new signals
+                Run <code className="text-[#34d399]">python3 src_file/scripts/deribit_iv_surface.py</code> to refresh,
+                then <code className="text-[#34d399]">python3 src_file/scripts/alpha_scanner.py</code> for new signals
               </p>
             </div>
           </div>
@@ -470,7 +470,7 @@ function OptionsTab({ iv }: { iv: APIResponse['ivSurface'] }) {
             Run the Deribit IV surface fetcher to enable options-vs-prediction-market arbitrage detection.
           </p>
           <code className="text-xs text-[#34d399] bg-[#0d1220] px-3 py-1 rounded">
-            python3 scripts/deribit_iv_surface.py --currency BTC
+            python3 src_file/scripts/deribit_iv_surface.py --currency BTC
           </code>
         </div>
       )}
@@ -520,15 +520,15 @@ function EmptyState() {
         </p>
         <div className="text-left bg-[#0d1220] rounded-xl p-4 text-xs font-mono text-[#34d399] space-y-1">
           <p># Step 1: Fetch historical markets</p>
-          <p>python3 scripts/fetch_historical_markets.py --limit 5000</p>
+          <p>python3 src_file/scripts/fetch_historical_markets.py --limit 5000</p>
           <p># Step 2: Score trust</p>
-          <p>python3 scripts/compute_historical_trust.py</p>
+          <p>python3 src_file/scripts/compute_historical_trust.py</p>
           <p># Step 3: ML backtest</p>
-          <p>python3 scripts/ml_enhanced_backtest.py</p>
+          <p>python3 src_file/scripts/ml_enhanced_backtest.py</p>
           <p># Step 4: Alpha scan</p>
-          <p>python3 scripts/alpha_scanner.py</p>
+          <p>python3 src_file/scripts/alpha_scanner.py</p>
           <p># Step 5: Options bridge</p>
-          <p>python3 scripts/deribit_iv_surface.py</p>
+          <p>python3 src_file/scripts/deribit_iv_surface.py</p>
         </div>
       </div>
     </div>

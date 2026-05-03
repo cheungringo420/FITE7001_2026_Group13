@@ -4,12 +4,13 @@ Step 4: Join trust scores with dispute events to create the analysis dataset.
 Output: data/trust_with_disputes.parquet
 
 Usage:
-  python3 scripts/join_trust_to_disputes.py
+  python3 src_file/scripts/join_trust_to_disputes.py
 """
 import os
 import pandas as pd
 
-DATA_DIR    = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR    = os.path.join(REPO_ROOT, "data")
 OUTPUT_FILE = os.path.join(DATA_DIR, "trust_with_disputes.parquet")
 
 

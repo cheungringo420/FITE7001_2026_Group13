@@ -4,8 +4,8 @@ Step 1: Fetch all resolved markets from Polymarket Gamma API.
 Writes to: data/markets_history.parquet (and Supabase if configured)
 
 Usage:
-  python3 scripts/fetch_historical_markets.py
-  python3 scripts/fetch_historical_markets.py --limit 500 --push-supabase
+  python3 src_file/scripts/fetch_historical_markets.py
+  python3 src_file/scripts/fetch_historical_markets.py --limit 500 --push-supabase
 """
 import argparse
 import json
@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GAMMA_BASE = "https://gamma-api.polymarket.com"
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+OUTPUT_DIR = os.path.join(REPO_ROOT, "data")
 BATCH_SIZE = 100
 
 

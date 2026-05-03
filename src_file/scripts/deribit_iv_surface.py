@@ -12,8 +12,8 @@ If prediction_price << N(d2) → BUY prediction market (underpriced vs options)
 If prediction_price >> N(d2) → SELL prediction market (overpriced vs options)
 
 Usage:
-  python3 scripts/deribit_iv_surface.py
-  python3 scripts/deribit_iv_surface.py --currency ETH --output data/eth_iv.json
+  python3 src_file/scripts/deribit_iv_surface.py
+  python3 src_file/scripts/deribit_iv_surface.py --currency ETH --output data/eth_iv.json
 """
 import argparse
 import json
@@ -24,7 +24,8 @@ from datetime import datetime, timezone
 import httpx
 import numpy as np
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR = os.path.join(REPO_ROOT, "data")
 
 DERIBIT_API = "https://www.deribit.com/api/v2/public"
 

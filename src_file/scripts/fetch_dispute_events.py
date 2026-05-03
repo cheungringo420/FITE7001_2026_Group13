@@ -7,8 +7,8 @@ Approach A (recommended): Dune Analytics API — pre-built query
 Approach B (fallback): Goldsky subgraph for Polygon UMA OptimisticOracle
 
 Usage:
-  python3 scripts/fetch_dispute_events.py --source dune --api-key YOUR_DUNE_KEY
-  python3 scripts/fetch_dispute_events.py --source gamma  # No API key needed
+  python3 src_file/scripts/fetch_dispute_events.py --source dune --api-key YOUR_DUNE_KEY
+  python3 src_file/scripts/fetch_dispute_events.py --source gamma  # No API key needed
 """
 import argparse
 import os
@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATA_DIR    = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR    = os.path.join(REPO_ROOT, "data")
 OUTPUT_FILE = os.path.join(DATA_DIR, "dispute_events.parquet")
 
 # ── Approach A: Dune Analytics ────────────────────────────────

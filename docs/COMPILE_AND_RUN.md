@@ -161,19 +161,19 @@ source .venv/bin/activate
 Install script dependencies:
 
 ```bash
-pip install -r scripts/requirements.txt
+pip install -r src_file/scripts/requirements.txt
 ```
 
 Run the alpha scanner:
 
 ```bash
-python3 scripts/alpha_scanner.py
+python3 src_file/scripts/alpha_scanner.py
 ```
 
 Run the trust-score backtest:
 
 ```bash
-python3 scripts/run_backtest.py
+python3 src_file/scripts/run_backtest.py
 ```
 
 The alpha scanner writes `data/alpha_signals.json`, which is served by `/api/signals`. Backtest outputs are used by the research/backtest pages.

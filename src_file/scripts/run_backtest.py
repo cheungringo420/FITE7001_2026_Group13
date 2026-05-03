@@ -7,9 +7,9 @@ Hypothesis H1: Markets with Trust Score < threshold have >= 2x dispute rate
 Statistical tests: Chi-Square contingency + Logistic Regression + AUC-ROC
 
 Usage:
-  python3 scripts/run_backtest.py
-  python3 scripts/run_backtest.py --threshold 50 --push-supabase
-  python3 scripts/run_backtest.py --sweep  # test multiple thresholds
+  python3 src_file/scripts/run_backtest.py
+  python3 src_file/scripts/run_backtest.py --threshold 50 --push-supabase
+  python3 src_file/scripts/run_backtest.py --sweep  # test multiple thresholds
 """
 import argparse
 import json
@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-DATA_DIR    = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR    = os.path.join(REPO_ROOT, "data")
 RESULTS_DIR = os.path.join(DATA_DIR, "backtest_results")
 
 

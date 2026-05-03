@@ -14,7 +14,7 @@ export async function GET() {
     if (!fs.existsSync(signalsPath)) {
       return NextResponse.json({
         status:   'no_data',
-        message:  'No signals available. Run: python3 scripts/alpha_scanner.py',
+        message:  'No signals available. Run: python3 src_file/scripts/alpha_scanner.py',
         signals:  [],
       });
     }

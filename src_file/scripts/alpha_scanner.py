@@ -10,8 +10,8 @@ Signal Sources:
 4. Price momentum divergence (price moving opposite to evidence quality)
 
 Usage:
-  python3 scripts/alpha_scanner.py
-  python3 scripts/alpha_scanner.py --live  # Continuous scanning mode
+  python3 src_file/scripts/alpha_scanner.py
+  python3 src_file/scripts/alpha_scanner.py --live  # Continuous scanning mode
 """
 import argparse
 import json
@@ -23,7 +23,8 @@ from typing import Optional
 import httpx
 import numpy as np
 
-DATA_DIR    = os.path.join(os.path.dirname(__file__), "..", "data")
+REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR    = os.path.join(REPO_ROOT, "data")
 GAMMA_BASE  = "https://gamma-api.polymarket.com"
 CLOB_BASE   = "https://clob.polymarket.com"
 DERIBIT_API = "https://www.deribit.com/api/v2/public"

@@ -13,7 +13,7 @@ from .base import Strategy
 class CrossPlatformArbitrage(Strategy):
     name = "cross_platform_arb"
     description = "Cross-platform arbitrage between Polymarket and Kalshi"
-    max_params = 2  # min_profit_threshold, min_alignment_score
+    max_params = 3  # min_profit_threshold, min_alignment_score, min_trust_score
 
     def __init__(self, config: dict):
         super().__init__(config)
@@ -24,6 +24,7 @@ class CrossPlatformArbitrage(Strategy):
         self.params = {
             "min_profit_threshold": self.min_profit_threshold,
             "min_alignment_score": self.min_alignment,
+            "min_trust_score": self.min_trust,
         }
 
     def compute_arbitrage_profit(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -56,8 +57,9 @@ class CrossPlatformArbitrage(Strategy):
 
         arb = self.compute_arbitrage_profit(data)
 
-        alignment = data.get("alignment_score", pd.Series(0.7, index=data.index))
-        dispute_risk = data.get("dispute_risk", pd.Series(0.02, index=data.index))
+        alignment = data.get("alignment_score", pd.Series(0.7, index=data.index)).fillna(0.0)
+        trust_score = data.get("trust_score", pd.Series(self.min_trust, index=data.index)).fillna(0.0)
+        dispute_risk = data.get("dispute_risk", pd.Series(0.02, index=data.index)).fillna(1.0)
 
         raas = self.compute_raas(arb["gross_profit"], alignment, dispute_risk)
 
@@ -67,7 +69,8 @@ class CrossPlatformArbitrage(Strategy):
         total_cost = poly_cost + kalshi_cost
 
         net_profit = arb["gross_profit"] - total_cost
-        signals = raas.where(net_profit > self.min_profit_threshold, 0.0)
+        eligible = (alignment >= self.min_alignment) & (trust_score >= self.min_trust)
+        signals = raas.where((net_profit > self.min_profit_threshold) & eligible, 0.0)
         return signals
 
     def generate_positions(self, signals: pd.Series, data: pd.DataFrame) -> pd.Series:
