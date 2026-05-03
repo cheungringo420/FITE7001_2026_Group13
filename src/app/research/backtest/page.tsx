@@ -27,6 +27,21 @@ interface StrategyResult {
   dynamic_vs_static?: Record<string, any>;
 }
 
+type ActiveTab = 'overview' | 'equity' | 'factors' | 'robustness' | 'events';
+
+interface ExplainerSection {
+  label: string;
+  text: string;
+}
+
+interface StrategyMethodology {
+  thesis: string;
+  signal: string;
+  controls: string;
+  interpretation: string;
+  caveat: string;
+}
+
 const STRATEGY_NAMES: Record<string, string> = {
   cross_platform_arb: 'Cross-Platform Arbitrage',
   lead_lag_vol: 'Volatility Timing (Lead-Lag)',
@@ -37,6 +52,99 @@ const STRATEGY_NAMES: Record<string, string> = {
 };
 
 const STRATEGY_IDS = Object.keys(STRATEGY_NAMES);
+
+const STRATEGY_METHODOLOGY: Record<string, StrategyMethodology> = {
+  cross_platform_arb: {
+    thesis: 'Tests whether the same event is priced differently on Polymarket and Kalshi after confirming that both contracts resolve on the same underlying outcome.',
+    signal: 'Resolution-Aware Arbitrage Signal: gross price gap is multiplied by resolution alignment and discounted by dispute risk. A trade is only eligible when net profit clears 1%, alignment is at least 0.65, and trust score is at least 60.',
+    controls: 'Uses explicit Polymarket and Kalshi spread assumptions, position caps, shifted returns to prevent look-ahead, train/test separation, and signal monotonicity checks.',
+    interpretation: 'A strong result means the apparent spread survives fees and is larger for higher-quality alignment signals, not merely that two market titles look similar.',
+    caveat: 'Execution still depends on order-book depth, legal access to both venues, and cross-venue settlement timing.',
+  },
+  lead_lag_vol: {
+    thesis: 'Tests whether prediction-market probability shocks lead volatility-sensitive assets such as VIX before traditional markets fully absorb the event information.',
+    signal: 'Uses changes in event probability, especially moves above the configured 8 percentage point threshold, then tests forward horizons from t+1 to t+5.',
+    controls: 'Predictive regressions use Newey-West standard errors for overlapping forward returns; performance is checked out-of-sample and after transaction costs.',
+    interpretation: 'The key evidence is not only Sharpe. The important question is whether beta and t-statistics peak at plausible lead-lag horizons.',
+    caveat: 'Lead-lag effects can decay quickly once discovered, and small test trade counts should be treated as research evidence rather than production proof.',
+  },
+  insurance_overlay: {
+    thesis: 'Tests whether high-trust binary prediction-market contracts can act as fixed-cost event insurance for equity portfolios.',
+    signal: 'Filters for high resolution confidence, sufficient liquidity, and event categories that plausibly hedge portfolio downside rather than create standalone alpha.',
+    controls: 'Evaluates beta versus SPY, correlation, carry cost, drawdown behavior, and out-of-sample performance under conservative sizing.',
+    interpretation: 'Success means the contract behaves like a hedge when the event risk matters; it does not need to maximize standalone return.',
+    caveat: 'Binary contracts hedge event occurrence, not severity. A $1 binary payout does not scale with how extreme the realized event becomes.',
+  },
+  dynamic_hedge: {
+    thesis: 'Tests whether hedge exposure should scale with live prediction-market probabilities instead of staying static through time.',
+    signal: 'Starts from a base hedge ratio and increases or decreases exposure as the market-implied event probability crosses configured high and low thresholds.',
+    controls: 'Compares dynamic versus static hedge performance, carry-cost savings, drawdown improvement, and risk metrics after rebalancing costs.',
+    interpretation: 'A good result means the overlay reduces unnecessary hedge carry while preserving downside protection when event risk rises.',
+    caveat: 'The method can fail if prediction markets update after traditional markets or if rebalancing costs consume the timing benefit.',
+  },
+  mean_reversion: {
+    thesis: 'Tests whether simple single-platform mispricings such as YES plus NO above fair value revert enough to earn profit after costs.',
+    signal: 'Flags overpriced binary bundles when the combined implied price exceeds the configured threshold, then exits on convergence or timeout.',
+    controls: 'Includes full spread assumptions and is intentionally kept as a negative-control strategy to prove the framework can reject weak ideas.',
+    interpretation: 'A weak or negative result is valuable: it shows that apparent micro-mispricings are often not tradable once costs are charged.',
+    caveat: 'This should not be presented as a failed project result; it is an honest null result that strengthens the methodology.',
+  },
+  market_making: {
+    thesis: 'Tests whether a binary-market liquidity provider can earn spread while controlling inventory risk using an Avellaneda-Stoikov style model.',
+    signal: 'Quotes are adjusted around a reservation price based on inventory and observed top-of-book conditions, then simulated as spread capture.',
+    controls: 'Tracks P&L, drawdown, trade count, tail risk, and simulated robustness, but marks the strategy explicitly as non-executable evidence.',
+    interpretation: 'A positive result suggests the market-making framework is worth studying, not that the exact simulated P&L can be captured live.',
+    caveat: 'Without tick-level order book history and queue-position data, fills and adverse selection are approximations.',
+  },
+};
+
+const TAB_EXPLAINERS: Record<ActiveTab, { title: string; summary: string; sections: ExplainerSection[] }> = {
+  overview: {
+    title: 'Overview Methodology',
+    summary: 'This section answers the first backtesting question: did the signal produce positive risk-adjusted results out-of-sample, and did stronger signals perform better than weaker signals?',
+    sections: [
+      { label: 'Performance table', text: 'Compares training results with unseen out-of-sample results. Sharpe, Sortino, Calmar, drawdown, win rate, and t-stat are read together rather than as one headline number.' },
+      { label: 'Monotonicity bar chart', text: 'Signals are sorted into quintiles from weakest to strongest. A credible signal should generally show higher average net returns in stronger buckets.' },
+      { label: 'Overfit check', text: 'The test/train Sharpe ratio flags strategies whose out-of-sample behavior collapses relative to the training period.' },
+    ],
+  },
+  equity: {
+    title: 'Equity Curve Methodology',
+    summary: 'This section shows how the strategy account value would have evolved during the out-of-sample test window after costs and position limits.',
+    sections: [
+      { label: 'What the line means', text: 'The curve compounds daily strategy returns from an initial capital base. It reflects the shifted position rule, so today\'s P&L comes from yesterday\'s signal.' },
+      { label: 'What to inspect', text: 'A smooth upward line is better than one driven by one jump. Drawdown depth and recovery time matter as much as ending value.' },
+      { label: 'Risk reading', text: 'A strategy can end positive but still be weak if it suffers large drawdowns or relies on a very small number of trades.' },
+    ],
+  },
+  factors: {
+    title: 'Factor Regression Methodology',
+    summary: 'This section tests whether the strategy is genuinely producing alpha or merely taking hidden exposure to common market factors.',
+    sections: [
+      { label: 'Regression model', text: 'Strategy returns are regressed on SPY, VIX, GLD, or similar factors. Alpha is the leftover return after those factor exposures are controlled.' },
+      { label: 'Alpha t-stat', text: 'A higher absolute t-stat means the estimated alpha is larger relative to statistical noise. The page uses a conservative threshold around 3.0 for finance research.' },
+      { label: 'R-squared', text: 'Low R-squared can be good here: it means standard factors explain only a small share of the strategy returns.' },
+    ],
+  },
+  robustness: {
+    title: 'Robustness Methodology',
+    summary: 'This section asks whether the result survives reasonable changes in assumptions rather than depending on one fragile parameter setting.',
+    sections: [
+      { label: 'Stress tests', text: 'Costs, liquidity thresholds, trust thresholds, or sizing parameters are varied to check whether the strategy remains stable.' },
+      { label: 'Risk metrics', text: 'VaR, CVaR, tail ratio, and loss streaks describe downside behavior beyond average return and Sharpe.' },
+      { label: 'Decision rule', text: 'If a strategy works only under one optimistic assumption, it should be treated as fragile even if the headline backtest looks attractive.' },
+    ],
+  },
+  events: {
+    title: 'Event Study Methodology',
+    summary: 'This section checks what happens around the event trigger itself, where day 0 is the signal or entry event.',
+    sections: [
+      { label: 'CAR chart', text: 'Cumulative abnormal return measures performance from before to after the event trigger. A useful signal should show return behavior concentrated after the trigger, not before it.' },
+      { label: 'Hedge diagnostics', text: 'For hedge strategies, beta, correlation, carry cost, and drawdown improvement matter more than raw return.' },
+      { label: 'Interpretation limit', text: 'If there are few events, the chart is useful for intuition but should not be treated as definitive statistical proof.' },
+    ],
+  },
+};
 
 function MetricRow({ label, train, test, fmt }: { label: string; train: number; test: number; fmt?: (n: number) => string }) {
   const format = fmt || ((n: number) => n.toFixed(4));
@@ -55,6 +163,79 @@ function SharpeColor({ value }: { value: number }) {
   return <span className={`font-bold ${color}`}>{value.toFixed(2)}</span>;
 }
 
+function MethodologyPanel({
+  title,
+  summary,
+  sections,
+  accent = 'brand',
+}: {
+  title: string;
+  summary: string;
+  sections: ExplainerSection[];
+  accent?: 'brand' | 'cyan';
+}) {
+  const accentClass = accent === 'cyan' ? 'text-accent-cyan' : 'text-brand-300';
+
+  return (
+    <section className="mb-6 rounded-xl border border-slate-700/50 bg-slate-900/70 p-5 shadow-xl shadow-black/10">
+      <div className="mb-4">
+        <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${accentClass}`}>Methodology</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
+        <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-300">{summary}</p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {sections.map((section) => (
+          <div key={section.label} className="border-l border-brand-500/30 pl-4">
+            <h3 className="text-sm font-semibold text-slate-100">{section.label}</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-400">{section.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StrategyMethodologyPanel({
+  strategyName,
+  methodology,
+  contribution,
+}: {
+  strategyName: string;
+  methodology: StrategyMethodology;
+  contribution?: StrategyResult['novel_contribution'];
+}) {
+  const sections: ExplainerSection[] = [
+    { label: 'Signal construction', text: methodology.signal },
+    { label: 'Backtest controls', text: methodology.controls },
+    { label: 'How to read it', text: methodology.interpretation },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <MethodologyPanel
+        title={`${strategyName}: Backtest Setup`}
+        summary={methodology.thesis}
+        sections={sections}
+      />
+      <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-5 py-4 text-sm leading-6 text-yellow-100">
+        <span className="font-semibold text-yellow-300">Important limitation:</span> {methodology.caveat}
+      </div>
+      {contribution && (
+        <div className="rounded-xl border border-brand-500/20 bg-brand-500/10 px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full bg-brand-500/15 px-3 py-1 font-mono text-sm font-bold text-brand-200">{contribution.name}</span>
+            <h3 className="text-base font-semibold text-white">{contribution.full_name}</h3>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{contribution.description}</p>
+          <div className="mt-3 rounded-lg bg-slate-950/60 px-3 py-2 font-mono text-xs text-accent-cyan">
+            {contribution.formula}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BacktestPageInner() {
   const searchParams = useSearchParams();
   const initialStrategy = searchParams.get('strategy') || 'cross_platform_arb';
@@ -62,7 +243,7 @@ function BacktestPageInner() {
   const [selected, setSelected] = useState(initialStrategy);
   const [data, setData] = useState<StrategyResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'equity' | 'factors' | 'robustness' | 'events'>('overview');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   useEffect(() => {
     setLoading(true);
@@ -100,6 +281,15 @@ function BacktestPageInner() {
   const sm = data.test_metrics;
   const pctFmt = (n: number) => `${(n * 100).toFixed(2)}%`;
   const fmtN = (n: number) => n.toFixed(4);
+  const strategyName = STRATEGY_NAMES[selected] || selected;
+  const strategyMethodology = STRATEGY_METHODOLOGY[selected] || {
+    thesis: 'Tests this strategy using the shared PM Arbitrage backtesting framework.',
+    signal: 'Signals are generated from historical market data and then converted into capped positions.',
+    controls: 'The engine applies transaction costs, train/test separation, shifted positions, and risk controls.',
+    interpretation: 'Read performance, risk, and robustness together rather than relying on one metric.',
+    caveat: 'This strategy does not have a custom methodology description yet.',
+  };
+  const tabExplainer = TAB_EXPLAINERS[activeTab];
 
   return (
     <div className="min-h-screen pb-20">
@@ -150,9 +340,15 @@ function BacktestPageInner() {
           </div>
         )}
 
+        <StrategyMethodologyPanel
+          strategyName={strategyName}
+          methodology={strategyMethodology}
+          contribution={data.novel_contribution}
+        />
+
         {/* Tab nav */}
-        <div className="flex gap-1 mb-6 border-b border-slate-800/50">
-          {(['overview', 'equity', 'factors', 'robustness', 'events'] as const).map(tab => (
+        <div className="mt-8 flex gap-1 mb-6 border-b border-slate-800/50">
+          {(['overview', 'equity', 'factors', 'robustness', 'events'] as ActiveTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -166,6 +362,13 @@ function BacktestPageInner() {
             </button>
           ))}
         </div>
+
+        <MethodologyPanel
+          title={tabExplainer.title}
+          summary={tabExplainer.summary}
+          sections={tabExplainer.sections}
+          accent="cyan"
+        />
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
@@ -226,20 +429,6 @@ function BacktestPageInner() {
                 </ResponsiveContainer>
               </div>
             </div>
-
-            {/* Novel Contribution */}
-            {data.novel_contribution && (
-              <div className="glass-strong rounded-xl p-6 lg:col-span-2 border border-brand-500/20">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="px-3 py-1 bg-brand-500/10 text-brand-300 rounded-full text-sm font-mono font-bold">{data.novel_contribution.name}</span>
-                  <h3 className="text-lg font-semibold text-white">{data.novel_contribution.full_name}</h3>
-                </div>
-                <p className="text-sm text-slate-300 mb-3">{data.novel_contribution.description}</p>
-                <div className="bg-slate-900/50 rounded-lg p-3 font-mono text-sm text-accent-cyan">
-                  {data.novel_contribution.formula}
-                </div>
-              </div>
-            )}
 
             {/* Predictive Regression (for lead-lag) */}
             {data.predictive_regression && (
