@@ -51,32 +51,25 @@ __pycache__/
 # One-off fix/deploy scripts (root-level development artifacts)
 /*.py
 
-# Draft documents and interim reports (keep only in final submission)
+# Draft documents and interim reports
 *.pdf
-docs/*.docx
-docs/*.backup-*.docx
-docs/*.pptx
+src_file/docs/*.docx
+src_file/docs/*.backup-*.docx
 data/*.pdf
 
 # Parquet/data files (too large for public repo)
 *.parquet
 
-# Exploration summaries (dev notes, not deliverables)
-docs/EXPLORATION-SUMMARY.md
-docs/WEBSITE-EXPLORATION-SUMMARY.md
-docs/reliability-core-migration.md
-docs/website-analysis-*.md
-docs/website-visual-summary.md
-
-# Legacy pptx workspace artifacts
-docs/pptx-workspace/
-
 # Slide build tooling node_modules
-docs/slides/workspace/node_modules/
+src_file/docs/slides/workspace/node_modules/
 
 # Temporary architecture diagrams
 public/architecture-diagram-*.png
 public/*.docx
+
+# src_file dev environment
+src_file/**/__pycache__/
+src_file/**/*.pyc
 
 # Python virtual environments
 venv/
