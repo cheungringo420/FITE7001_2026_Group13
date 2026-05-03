@@ -71,6 +71,9 @@ public/*.docx
 src_file/**/__pycache__/
 src_file/**/*.pyc
 
+# Presentation materials — kept local, not published to GitHub
+src_file/docs/
+
 # Python virtual environments
 venv/
 **/venv/
