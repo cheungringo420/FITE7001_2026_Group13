@@ -310,7 +310,6 @@ input[type="range"]::-moz-range-thumb:hover {
 /* Featured active (Arbitrage) — stronger glow */
 .nav-featured-active {
   box-shadow:
-    0 0 0 1px rgba(23, 227, 193, 0.3),
     0 0 16px rgba(23, 227, 193, 0.18),
     inset 0 0 12px rgba(23, 227, 193, 0.06);
 }

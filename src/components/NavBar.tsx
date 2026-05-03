@@ -147,10 +147,10 @@ export function NavBar() {
                                         key={item.href}
                                         href={item.href}
                                         className={[
-                                            'relative px-3.5 py-[7px] text-[11px] font-medium flex items-center gap-1.5 rounded-lg transition-all duration-200 border nav-item',
+                                            'relative px-3.5 py-[7px] text-[11px] font-medium flex items-center gap-1.5 rounded-lg transition-all duration-200 border border-transparent nav-item',
                                             active
-                                                ? 'bg-gradient-to-r from-brand-500/20 to-cyan-500/20 text-[#17e3c1] border-[rgba(23,227,193,0.5)] nav-featured-active'
-                                                : 'bg-gradient-to-r from-brand-500/10 to-cyan-500/10 text-brand-200 border-brand-500/25 hover:from-brand-500/18 hover:to-cyan-500/18 hover:border-brand-500/40 hover:text-[#17e3c1]',
+                                                ? 'bg-gradient-to-r from-brand-500/20 to-cyan-500/20 text-[#17e3c1] nav-featured-active'
+                                                : 'bg-gradient-to-r from-brand-500/10 to-cyan-500/10 text-brand-200 hover:from-brand-500/18 hover:to-cyan-500/18 hover:text-[#17e3c1]',
                                         ].join(' ')}
                                         style={{ fontFamily: 'var(--font-jetbrains-mono)' }}
                                     >
