@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type CSSProperties } from 'react';
 import { MarketCompareCard, MarketCompareCardSkeleton, SingleMarketCard } from '@/components/MarketCompareCard';
 import { ExecuteArbitrageModal } from '@/components';
 import { NormalizedMarket, ArbitrageOpportunity } from '@/lib/kalshi/types';
@@ -29,6 +29,31 @@ interface CompareResponse {
 }
 
 type ViewMode = 'matched' | 'all';
+
+const RANGE_TRACK_EMPTY = 'rgb(51 65 85)';
+const RANGE_TRACK_FILL = 'rgb(34 197 94)';
+const SIMILARITY_RANGE = { min: 20, max: 90 };
+const TRUST_RANGE = { min: 0, max: 100 };
+const ALIGNMENT_RANGE = { min: 0, max: 90 };
+
+function rangeFillPercent(value: number, min: number, max: number) {
+    if (max <= min) return 0;
+    return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+}
+
+function solidRangeTrack(value: number, min: number, max: number, fill = RANGE_TRACK_FILL): CSSProperties {
+    const fillPercent = rangeFillPercent(value, min, max);
+    return {
+        background: `linear-gradient(to right, ${fill} 0%, ${fill} ${fillPercent}%, ${RANGE_TRACK_EMPTY} ${fillPercent}%, ${RANGE_TRACK_EMPTY} 100%)`,
+    };
+}
+
+function similarityRangeTrack(value: number): CSSProperties {
+    const fillPercent = rangeFillPercent(value, SIMILARITY_RANGE.min, SIMILARITY_RANGE.max);
+    return {
+        background: `linear-gradient(to right, transparent 0%, transparent ${fillPercent}%, ${RANGE_TRACK_EMPTY} ${fillPercent}%, ${RANGE_TRACK_EMPTY} 100%), linear-gradient(to right, rgb(249 115 22) 0%, rgb(234 179 8) 50%, rgb(34 197 94) 100%)`,
+    };
+}
 
 export default function ComparePage() {
     const [data, setData] = useState<CompareResponse | null>(null);
@@ -278,19 +303,13 @@ export default function ComparePage() {
                         <div className="relative">
                             <input
                                 type="range"
-                                min="20"
-                                max="90"
+                                min={SIMILARITY_RANGE.min}
+                                max={SIMILARITY_RANGE.max}
                                 step="5"
                                 value={similarityThreshold * 100}
                                 onChange={(e) => setSimilarityThreshold(parseInt(e.target.value) / 100)}
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider-thumb"
-                                style={{
-                                    background: `linear-gradient(to right, 
-                                        rgb(249 115 22) 0%, 
-                                        rgb(234 179 8) 40%, 
-                                        rgb(34 197 94) 80%, 
-                                        rgb(34 197 94) 100%)`
-                                }}
+                                style={similarityRangeTrack(similarityThreshold * 100)}
                             />
                             <div className="flex justify-between text-xs text-slate-500 mt-2">
                                 <span>20% (More matches)</span>
@@ -328,15 +347,13 @@ export default function ComparePage() {
                             </div>
                             <input
                                 type="range"
-                                min="0"
-                                max="100"
+                                min={TRUST_RANGE.min}
+                                max={TRUST_RANGE.max}
                                 step="5"
                                 value={minTrust}
                                 onChange={(e) => setMinTrust(parseInt(e.target.value, 10))}
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                                style={{
-                                    background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${minTrust}%, rgb(51 65 85) ${minTrust}%, rgb(51 65 85) 100%)`
-                                }}
+                                style={solidRangeTrack(minTrust, TRUST_RANGE.min, TRUST_RANGE.max)}
                             />
                             <div className="flex justify-between text-xs text-slate-500 mt-2">
                                 <span>0 (All)</span>
@@ -351,15 +368,13 @@ export default function ComparePage() {
                             </div>
                             <input
                                 type="range"
-                                min="0"
-                                max="90"
+                                min={ALIGNMENT_RANGE.min}
+                                max={ALIGNMENT_RANGE.max}
                                 step="5"
                                 value={Math.round(alignmentThreshold * 100)}
                                 onChange={(e) => setAlignmentThreshold(parseInt(e.target.value, 10) / 100)}
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                                style={{
-                                    background: `linear-gradient(to right, rgb(34 197 94) 0%, rgb(34 197 94) ${alignmentThreshold * 100}%, rgb(51 65 85) ${alignmentThreshold * 100}%, rgb(51 65 85) 100%)`
-                                }}
+                                style={solidRangeTrack(Math.round(alignmentThreshold * 100), ALIGNMENT_RANGE.min, ALIGNMENT_RANGE.max)}
                             />
                             <div className="flex justify-between text-xs text-slate-500 mt-2">
                                 <span>0% (All)</span>

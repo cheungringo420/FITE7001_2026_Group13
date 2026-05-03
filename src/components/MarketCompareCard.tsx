@@ -21,6 +21,29 @@ interface MarketCompareCardProps {
     };
 }
 
+function finiteNumber(value: unknown, fallback = 0) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function formatVolume(volume: unknown) {
+    const safeVolume = finiteNumber(volume);
+    if (safeVolume >= 1000000) return `$${(safeVolume / 1000000).toFixed(1)}M`;
+    if (safeVolume >= 1000) return `$${(safeVolume / 1000).toFixed(1)}K`;
+    return `$${safeVolume.toFixed(0)}`;
+}
+
+function formatCents(price: unknown) {
+    return `${(finiteNumber(price) * 100).toFixed(1)}¢`;
+}
+
+function formatPercent(value: unknown, fractionDigits = 2) {
+    return finiteNumber(value).toFixed(fractionDigits);
+}
+
+function formatDollars(value: unknown, fractionDigits = 4) {
+    return `$${finiteNumber(value).toFixed(fractionDigits)}`;
+}
+
 export function MarketCompareCard({
     polymarket,
     kalshi,
@@ -34,17 +57,18 @@ export function MarketCompareCard({
     matchingMethod,
     trust,
 }: MarketCompareCardProps) {
-    const formatVolume = (volume: number) => {
-        if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
-        if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`;
-        return `$${volume.toFixed(0)}`;
-    };
-
-    const priceDiffYes = ((polymarket.yesPrice - kalshi.yesPrice) * 100).toFixed(1);
-    const priceDiffNo = ((polymarket.noPrice - kalshi.noPrice) * 100).toFixed(1);
-    const matchTier = similarity >= 0.75 ? 'high' : similarity >= 0.6 ? 'medium' : 'low';
+    const polymarketYesPrice = finiteNumber(polymarket.yesPrice);
+    const polymarketNoPrice = finiteNumber(polymarket.noPrice);
+    const kalshiYesPrice = finiteNumber(kalshi.yesPrice);
+    const kalshiNoPrice = finiteNumber(kalshi.noPrice);
+    const similarityScore = finiteNumber(similarity);
+    const priceDiffYes = (polymarketYesPrice - kalshiYesPrice) * 100;
+    const priceDiffNo = (polymarketNoPrice - kalshiNoPrice) * 100;
+    const strategyACost = polymarketYesPrice + kalshiNoPrice;
+    const strategyBCost = polymarketNoPrice + kalshiYesPrice;
+    const matchTier = similarityScore >= 0.75 ? 'high' : similarityScore >= 0.6 ? 'medium' : 'low';
     const matchLabel = matchTier === 'high' ? 'High confidence' : matchTier === 'medium' ? 'Related' : 'Low confidence';
-    const alignmentScore = alignmentBreakdown?.score ?? 0;
+    const alignmentScore = finiteNumber(alignmentBreakdown?.score);
 
     return (
         <div className={`relative rounded-2xl border transition-all duration-300 overflow-hidden ${arbitrage
@@ -54,7 +78,7 @@ export function MarketCompareCard({
             {/* Arbitrage Badge */}
             {arbitrage && (
                 <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-400 to-brand-400 text-black font-bold px-4 py-1 text-sm rounded-bl-xl">
-                    💰 +{arbitrage.profitPercentage.toFixed(2)}% Arbitrage
+                    💰 +{formatPercent(arbitrage.profitPercentage)}% Arbitrage
                 </div>
             )}
 
@@ -102,11 +126,11 @@ export function MarketCompareCard({
                         }`}>
                         {matchLabel}
                     </span>
-                    <span className={`px-2 py-0.5 rounded ${similarity >= 0.6 ? 'bg-green-500/20 text-green-400' :
-                        similarity >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
+                    <span className={`px-2 py-0.5 rounded ${similarityScore >= 0.6 ? 'bg-green-500/20 text-green-400' :
+                        similarityScore >= 0.45 ? 'bg-yellow-500/20 text-yellow-400' :
                             'bg-slate-600/50 text-slate-400'
                         }`}>
-                        {similarity >= 0.6 ? '🎯' : similarity >= 0.45 ? '🔗' : '💡'} {(similarity * 100).toFixed(0)}% similar
+                        {similarityScore >= 0.6 ? '🎯' : similarityScore >= 0.45 ? '🔗' : '💡'} {(similarityScore * 100).toFixed(0)}% similar
                     </span>
                     {alignmentBreakdown && (
                         <span className={`px-2 py-0.5 rounded ${alignmentScore >= 0.7 ? 'bg-emerald-500/15 text-emerald-300' :
@@ -247,7 +271,7 @@ export function MarketCompareCard({
                                 ? 'text-green-400 animate-pulse'
                                 : 'text-green-400'
                                 }`}>
-                                {(polymarket.yesPrice * 100).toFixed(1)}¢
+                                {formatCents(polymarketYesPrice)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -256,7 +280,7 @@ export function MarketCompareCard({
                                 ? 'text-red-400 animate-pulse'
                                 : 'text-red-400'
                                 }`}>
-                                {(polymarket.noPrice * 100).toFixed(1)}¢
+                                {formatCents(polymarketNoPrice)}
                             </span>
                         </div>
                         <div className="pt-2 border-t border-slate-700/50 space-y-1">
@@ -311,11 +335,11 @@ export function MarketCompareCard({
                                     ? 'text-green-400 animate-pulse'
                                     : 'text-green-400'
                                     }`}>
-                                    {(kalshi.yesPrice * 100).toFixed(1)}¢
+                                    {formatCents(kalshiYesPrice)}
                                 </span>
-                                {parseFloat(priceDiffYes) !== 0 && (
-                                    <span className={`text-xs ${parseFloat(priceDiffYes) > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {parseFloat(priceDiffYes) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(priceDiffYes))}¢
+                                {priceDiffYes !== 0 && (
+                                    <span className={`text-xs ${priceDiffYes > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {priceDiffYes > 0 ? '▲' : '▼'} {Math.abs(priceDiffYes).toFixed(1)}¢
                                     </span>
                                 )}
                             </div>
@@ -327,11 +351,11 @@ export function MarketCompareCard({
                                     ? 'text-red-400 animate-pulse'
                                     : 'text-red-400'
                                     }`}>
-                                    {(kalshi.noPrice * 100).toFixed(1)}¢
+                                    {formatCents(kalshiNoPrice)}
                                 </span>
-                                {parseFloat(priceDiffNo) !== 0 && (
-                                    <span className={`text-xs ${parseFloat(priceDiffNo) > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {parseFloat(priceDiffNo) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(priceDiffNo))}¢
+                                {priceDiffNo !== 0 && (
+                                    <span className={`text-xs ${priceDiffNo > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {priceDiffNo > 0 ? '▲' : '▼'} {Math.abs(priceDiffNo).toFixed(1)}¢
                                     </span>
                                 )}
                             </div>
@@ -373,20 +397,20 @@ export function MarketCompareCard({
                                 <div className="text-sm text-slate-300">
                                     {arbitrage.strategy === 'buy-yes-a-no-b' ? (
                                         <>
-                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.yesPrice * 100).toFixed(1)}¢
+                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {formatCents(arbitrage.platform1.yesPrice)}
                                             {' + '}
-                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.noPrice * 100).toFixed(1)}¢
+                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {formatCents(arbitrage.platform2.noPrice)}
                                         </>
                                     ) : (
                                         <>
-                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform1.noPrice * 100).toFixed(1)}¢
+                                            Buy <span className="text-red-400 font-semibold">NO</span> on {arbitrage.platform1.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {formatCents(arbitrage.platform1.noPrice)}
                                             {' + '}
-                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {(arbitrage.platform2.yesPrice * 100).toFixed(1)}¢
+                                            Buy <span className="text-green-400 font-semibold">YES</span> on {arbitrage.platform2.name === 'polymarket' ? 'Polymarket' : 'Kalshi'} @ {formatCents(arbitrage.platform2.yesPrice)}
                                         </>
                                     )}
                                 </div>
                                 <div className="text-xs text-slate-400 mt-1">
-                                    Cost: ${arbitrage.totalCost.toFixed(4)} → Payout: $1.00 = <span className="text-green-400">${arbitrage.guaranteedProfit.toFixed(4)} profit</span>
+                                    Cost: {formatDollars(arbitrage.totalCost)} → Payout: $1.00 = <span className="text-green-400">{formatDollars(arbitrage.guaranteedProfit)} profit</span>
                                 </div>
                             </>
                         ) : (
@@ -394,17 +418,17 @@ export function MarketCompareCard({
                                 <div className="text-sm text-slate-400">
                                     <div className="flex flex-wrap gap-x-4 gap-y-1">
                                         <span>
-                                            Strategy A: <span className="text-green-400/70">YES</span>@P + <span className="text-red-400/70">NO</span>@K = {((polymarket.yesPrice + kalshi.noPrice) * 100).toFixed(1)}¢
-                                            {polymarket.yesPrice + kalshi.noPrice < 1
+                                            Strategy A: <span className="text-green-400/70">YES</span>@P + <span className="text-red-400/70">NO</span>@K = {(strategyACost * 100).toFixed(1)}¢
+                                            {strategyACost < 1
                                                 ? <span className="text-green-400 ml-1">✓</span>
-                                                : <span className="text-slate-500 ml-1">({((polymarket.yesPrice + kalshi.noPrice - 1) * 100).toFixed(1)}¢ over)</span>
+                                                : <span className="text-slate-500 ml-1">({((strategyACost - 1) * 100).toFixed(1)}¢ over)</span>
                                             }
                                         </span>
                                         <span>
-                                            Strategy B: <span className="text-red-400/70">NO</span>@P + <span className="text-green-400/70">YES</span>@K = {((polymarket.noPrice + kalshi.yesPrice) * 100).toFixed(1)}¢
-                                            {polymarket.noPrice + kalshi.yesPrice < 1
+                                            Strategy B: <span className="text-red-400/70">NO</span>@P + <span className="text-green-400/70">YES</span>@K = {(strategyBCost * 100).toFixed(1)}¢
+                                            {strategyBCost < 1
                                                 ? <span className="text-green-400 ml-1">✓</span>
-                                                : <span className="text-slate-500 ml-1">({((polymarket.noPrice + kalshi.yesPrice - 1) * 100).toFixed(1)}¢ over)</span>
+                                                : <span className="text-slate-500 ml-1">({((strategyBCost - 1) * 100).toFixed(1)}¢ over)</span>
                                             }
                                         </span>
                                     </div>
@@ -439,12 +463,6 @@ interface SingleMarketCardProps {
 }
 
 export function SingleMarketCard({ market, platform, trust }: SingleMarketCardProps) {
-    const formatVolume = (volume: number) => {
-        if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
-        if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`;
-        return `$${volume.toFixed(0)}`;
-    };
-
     const isPoly = platform === 'polymarket';
 
     return (
@@ -486,13 +504,13 @@ export function SingleMarketCard({ market, platform, trust }: SingleMarketCardPr
                 <div className="text-center p-2 bg-green-500/10 rounded-lg">
                     <div className="text-xs text-green-400">Yes</div>
                     <div className="text-sm font-bold text-green-400">
-                        {(market.yesPrice * 100).toFixed(1)}¢
+                        {formatCents(market.yesPrice)}
                     </div>
                 </div>
                 <div className="text-center p-2 bg-red-500/10 rounded-lg">
                     <div className="text-xs text-red-400">No</div>
                     <div className="text-sm font-bold text-red-400">
-                        {(market.noPrice * 100).toFixed(1)}¢
+                        {formatCents(market.noPrice)}
                     </div>
                 </div>
             </div>
